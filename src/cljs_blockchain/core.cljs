@@ -31,15 +31,15 @@
    :timestamp 0
    :transactions #{}
    :epoch (compute-epoch t)
-   :proof 0x1
+   ; one reason why you should not use this for anything serious:
+   ; somebody can generate an entire epoch worth of blocks
+   ; for some future block, winning all mining rewards for the block
+   ; because the following value is deterministic and predictable
+   :pow (nacl.hash (js/Uint8Array. (str "cljs-blockchain #" (compute-epoch t))))
    :previous-hash 0x1})
 
-(defn blockchain-init []
-  {:transactions #{}
-   :chain []})
-
 (defn has-epoch-changed [epoch blockchain]
-  (not= epoch (get-in blockchain [:chain 0 :epoch])))
+  (not= epoch (get-in blockchain [0 :epoch])))
 
 ;*** data manipulation ***;
 
@@ -75,9 +75,9 @@
           ; compute current epoch
           current-epoch (compute-epoch (now))
           ; ensure blockchain structure
-          new-state (update-in new-state [:blockchain] #(if (has-epoch-changed current-epoch %) (blockchain-init) %))
+          new-state (update-in new-state [:blockchain] #(if (has-epoch-changed current-epoch %) [] %))
           ; ensure genesis block
-          new-state (update-in new-state [:blockchain :chain 0] #(or % (blockchain-make-genesis-block (now))))
+          new-state (update-in new-state [:blockchain 0] #(or % (blockchain-make-genesis-block (now))))
           ; ensure mempool structure
           new-state (update-in new-state [:mempool] #(or % #{}))
           ; ensure webtorrent connection
@@ -96,7 +96,7 @@
   [:div
    [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]
    [:h2 "cljs-blockchain"]
-   [:h3 "epoch: " (get-in @state [:blockchain :chain 0 :epoch])]
+   [:h3 "epoch: " (get-in @state [:blockchain 0 :epoch])]
    [:div "Your public key:" [:pre (pk @state)]]
    [:div [:h3 "Add a transaction:"]
     [:input {:placeholder "to public key"}]
