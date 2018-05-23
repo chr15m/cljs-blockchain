@@ -24,6 +24,9 @@
 (defn compute-epoch [t]
   (-> t (/ ms-per-day) (int)))
 
+(defn has-epoch-changed [epoch blockchain]
+  (not= epoch (get-in blockchain [0 :epoch])))
+
 ;*** blockchain ***;
 
 (defn blockchain-make-genesis-block [t]
@@ -37,9 +40,6 @@
    ; because the following value is deterministic and predictable
    :pow (nacl.hash (js/Uint8Array. (str "cljs-blockchain #" (compute-epoch t))))
    :previous-hash 0x1})
-
-(defn has-epoch-changed [epoch blockchain]
-  (not= epoch (get-in blockchain [0 :epoch])))
 
 ;*** data manipulation ***;
 
@@ -67,6 +67,28 @@
 
 ;*** main event loop ***;
 
+(defn add-transaction-to-mempool [new-state {:keys [to from amount]}]
+  (print "adding transaction:" to from amount)
+  ; TODO: regex check to is hex
+  ; TODO: regex check from is hex
+  ; TODO: regex check amount is number
+  (let [to (from-hex to)
+        from (from-hex from)
+        amount (int amount)]
+    ; TODO: also check balance
+    ; TODO: also check from address is own
+    (if (and
+          (= (.-length to) 32)
+          (= (.-length from) 32)
+          (> amount 0))
+      (update-in new-state [:mempool] conj {:to to :from from :amount amount})
+      new-state)))
+
+(defn process-event [new-state event]
+  (cond
+    (event :add-transaction) (add-transaction-to-mempool new-state (event :add-transaction))
+    :else new-state))
+
 (defn main-loop [old-state]
   (go
     (let [new-state old-state
@@ -81,7 +103,8 @@
           ; ensure mempool structure
           new-state (update-in new-state [:mempool] #(or % #{}))
           ; ensure webtorrent connection
-          ]
+          ; process events
+          new-state (process-event new-state event)]
       (js/console.log "main-loop new-state:" (clj->js new-state))
       new-state)))
 
@@ -93,16 +116,20 @@
 ;; Views
 
 (defn home-page [state]
-  [:div
-   [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]
-   [:h2 "cljs-blockchain"]
-   [:h3 "epoch: " (get-in @state [:blockchain 0 :epoch])]
-   [:div "Your public key:" [:pre (pk @state)]]
-   [:div [:h3 "Add a transaction:"]
-    [:input {:placeholder "to public key"}]
-    [:input {:placeholder "amount"}]
-    [:input {:placeholder "message"}]
-    [:button "Send"]]])
+  (let [to (r/atom "")
+        amount (r/atom "")]
+    (fn []
+      [:div
+       [:h2 "cljs-blockchain"]
+       [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]
+       [:p "this blockchain resets every 24 hrs, deleting all history."]
+       [:h3 "epoch: " (get-in @state [:blockchain 0 :epoch])]
+       [:div "Your public key:" [:pre (pk @state)]]
+       [:div [:h3 "Add a transaction:"]
+        [:input {:placeholder "to public key" :on-change #(reset! to (-> % .-target .-value)) :value @to}]
+        [:input {:placeholder "amount" :on-change #(reset! amount (-> % .-target .-value)) :value @amount}]
+        ; [:input {:placeholder "message"}]
+        [:button {:on-click #(put! (@state :incoming) {:add-transaction {:to @to :from (pk @state) :amount (int @amount)}})} "Send"]]])))
 
 ;; -------------------------
 ;; Initialize app
@@ -118,3 +145,4 @@
   ; check for blockchain epoch change (reset chain daily) every second
   (js/setInterval #(check-epoch state) 1000)
   (mount-root))
+
