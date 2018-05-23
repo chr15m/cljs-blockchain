@@ -1,5 +1,6 @@
 (ns cljs-blockchain.core
   (:require
+    [cljs.reader] 
     [cljs.core.async :refer [chan <! timeout put!]]
     ["bencode-js/lib/index" :as bencode]
     ["scrypt-js/scrypt" :as scrypt]
@@ -11,18 +12,17 @@
 
 (defonce state (r/atom {:incoming (chan)}))
 
-
 ;*** utility fns ***;
 
 (def ms-per-day (* 1000 60 60 24))
+
+(def storage (aget js/window "localStorage"))
 
 (defn now []
   (-> (js/Date.) (.getTime)))
 
 (defn compute-epoch [t]
   (-> t (/ ms-per-day) (int)))
-
-(defn until-next-epoch [])
 
 ;*** blockchain ***;
 
@@ -57,6 +57,14 @@
       (or #js [])
       (to-hex)))
 
+;*** crypto ***;
+
+(defn ensure-keypair! []
+  (let [k (cljs.reader/read-string (.getItem storage "secret-key"))
+        k (if k (nacl.sign.keyPair.fromSecretKey (js/Uint8Array. k)) (nacl.sign.keyPair))]
+    (.setItem storage "secret-key" (prn-str (js/Array.from (.-secretKey k))))
+    k))
+
 ;*** main event loop ***;
 
 (defn main-loop [old-state]
@@ -66,10 +74,6 @@
           event (<! (new-state :incoming))
           ; compute current epoch
           current-epoch (compute-epoch (now))
-          ; ensure wallet keys
-          new-state (update-in new-state [:keypair] #(or % (nacl.sign.keyPair)))
-          ; ensure webtorrent instance
-          ;new-state (update-in new-state [:net] #(or % (wt.)))
           ; ensure blockchain structure
           new-state (update-in new-state [:blockchain] #(if (has-epoch-changed current-epoch %) (blockchain-init) %))
           ; ensure genesis block
@@ -108,6 +112,7 @@
   (r/render [home-page state] (.getElementById js/document "app")))
 
 (defn init! []
+  (swap! state assoc :keypair (ensure-keypair!))
   ; app state mutation happens here
   (go-loop [] (reset! state (<! (main-loop @state))) (recur))
   ; check for blockchain epoch change (reset chain daily) every second
