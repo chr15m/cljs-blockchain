@@ -49,8 +49,17 @@
 ;; -------------------------
 ;; Views
 
-(defn home-page []
-  [:div [:h2 "Welcome to Reagent"]])
+(defn home-page [state]
+  [:div
+   [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]
+   [:h2 "cljs-blockchain"]
+   [:h3 "epoch: " (@state :epoch)]
+   [:div "Your public key:" [:pre (pk @state)]]
+   [:div [:h3 "Add a transaction:"]
+    [:input {:placeholder "to public key"}]
+    [:input {:placeholder "amount"}]
+    [:input {:placeholder "message"}]
+    [:button "Send"]]])
 
 ;; -------------------------
 ;; Initialize app
