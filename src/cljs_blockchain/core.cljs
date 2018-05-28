@@ -75,6 +75,7 @@
   (let [to (from-hex to)
         from (from-hex from)
         amount (int amount)]
+    (print (bencode/encode #js {:to to :from from :amount amount}))
     ; TODO: also check balance
     ; TODO: also check from address is own
     (if (and
@@ -116,20 +117,44 @@
 ;; Views
 
 (defn home-page [state]
+  ; TODO: transaction validation
   (let [to (r/atom "")
         amount (r/atom "")]
     (fn []
       [:div
-       [:h2 "cljs-blockchain"]
-       [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]
-       [:p "this blockchain resets every 24 hrs, deleting all history."]
-       [:h3 "epoch: " (get-in @state [:blockchain 0 :epoch])]
-       [:div "Your public key:" [:pre (pk @state)]]
-       [:div [:h3 "Add a transaction:"]
+       [:div#header
+        [:h2 "cljs-blockchain"]
+        [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]
+        [:p [:small "this blockchain resets every 24 hrs, deleting all history."]]]
+       [:div#user
+        [:h3 "wallet"]
+        [:p "public key: " [:code (pk @state)]]
+        [:p "balance: " 0]]
+       [:div#ui
+        [:h3 "make transaction"]
         [:input {:placeholder "to public key" :on-change #(reset! to (-> % .-target .-value)) :value @to}]
         [:input {:placeholder "amount" :on-change #(reset! amount (-> % .-target .-value)) :value @amount}]
         ; [:input {:placeholder "message"}]
-        [:button {:on-click #(put! (@state :incoming) {:add-transaction {:to @to :from (pk @state) :amount (int @amount)}})} "Send"]]])))
+        [:button {:on-click #(put! (@state :incoming) {:add-transaction {:to @to :from (pk @state) :amount (int @amount)}})} "Send"]]
+       [:div#mining
+        [:h3 "mining"]
+        [:button "mine a block"]]
+       [:div#stats
+        [:h3 "stats"]
+        [:table
+         [:tr
+          [:td "mempool size"]
+          [:td (count (@state :mempool))]]
+         [:tr
+          [:td "difficulty"]
+          [:td 0]]
+         [:tr
+          [:td "block epoch"]
+          [:td (get-in @state [:blockchain 0 :epoch])]]]]
+       [:div#blockchain
+        [:h3 "blockchain history"]
+        "..."
+        ]])))
 
 ;; -------------------------
 ;; Initialize app
