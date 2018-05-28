@@ -27,20 +27,6 @@
 (defn has-epoch-changed [epoch blockchain]
   (not= epoch (get-in blockchain [0 :epoch])))
 
-;*** blockchain ***;
-
-(defn blockchain-make-genesis-block [t]
-  {:index 1
-   :timestamp 0
-   :transactions #{}
-   :epoch (compute-epoch t)
-   ; one reason why you should not use this for anything serious:
-   ; somebody can generate an entire epoch worth of blocks
-   ; for some future block, winning all mining rewards for the block
-   ; because the following value is deterministic and predictable
-   :pow (nacl.hash (js/Uint8Array. (str "cljs-blockchain #" (compute-epoch t))))
-   :previous-hash 0x1})
-
 ;*** data manipulation ***;
 
 (defn to-hex [b]
@@ -49,6 +35,11 @@
 (defn from-hex [b]
   (js/Uint8Array. (map #(js/parseInt (apply str %) 16) (partition 2 b))))
 
+(defn fingerprint [x]
+  (-> x
+      (to-hex)
+      (.substring 0 8)))
+
 (defn pk [state]
   (-> state
       :keypair
@@ -56,6 +47,28 @@
       (.. -publicKey)
       (or #js [])
       (to-hex)))
+
+;*** blockchain ***;
+
+(defn blockchain-make-genesis-block [t]
+  {:timestamp 0
+   :transactions #{}
+   :epoch (compute-epoch t)
+   ; one reason why you should not use this for anything serious:
+   ; somebody can generate an entire epoch worth of blocks
+   ; for some future block, winning all mining rewards for the block
+   ; because the following value is deterministic and predictable
+   :pow (nacl.hash (js/Uint8Array. (str "cljs-blockchain #" (compute-epoch t))))
+   :nonce 0
+   :previous-hash 0x1})
+
+(defn blockchain-make-block [t transactions previous-hash]
+  {:timestamp t
+   :transactions transactions
+   :epoch (compute-epoch t)
+   :pow (nacl.hash (js/Uint8Array. (str (to-hex previous-hash) "hello")))
+   :nonce 0
+   :previous-hash previous-hash})
 
 ;*** crypto ***;
 
@@ -66,6 +79,15 @@
     k))
 
 ;*** main event loop ***;
+
+(defn add-block-to-blockchain [new-state]
+  ; split top ten transactions by fee off mempool
+  (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
+        [transactions mempool-remaining] (split-at 10 mempool-by-fee)
+        previous-hash (-> new-state :blockchain (last) :pow)]
+    (-> new-state
+        (update-in [:blockchain] conj (blockchain-make-block (now) transactions previous-hash))
+        (assoc :mempool mempool-remaining))))
 
 (defn add-transaction-to-mempool [new-state {:keys [to from amount]}]
   (print "adding transaction:" to from amount)
@@ -88,6 +110,7 @@
 (defn process-event [new-state event]
   (cond
     (event :add-transaction) (add-transaction-to-mempool new-state (event :add-transaction))
+    (event :add-block) (add-block-to-blockchain new-state)
     :else new-state))
 
 (defn main-loop [old-state]
@@ -105,7 +128,7 @@
           new-state (update-in new-state [:mempool] #(or % #{}))
           ; ensure webtorrent connection
           ; process events
-          new-state (process-event new-state event)]
+          new-state (try (process-event new-state event) (catch :default e (do (js/console.error e) new-state)))]
       (js/console.log "main-loop new-state:" (clj->js new-state))
       new-state)))
 
@@ -123,6 +146,9 @@
                              :amount (int (@interface :amount))
                              :fee (int (@interface :fee))}})
   (reset! interface {}))
+
+(defn submit-block [state]
+  (put! (@state :incoming) {:add-block true}))
 
 (defn home-page [state]
   ; TODO: transaction validation
@@ -149,29 +175,35 @@
         [:button {:on-click (partial submit-transaction state interface)} "Send"]]
        [:div#mining
         [:h3 "mining"]
-        [:button "mine a block"]]
+        [:button {:on-click (partial submit-block state)} "mine a block"]]
        [:div#stats
         [:h3 "stats"]
         [:table
-         [:tr
-          [:td "peers"]
-          [:td 0]]
-         [:tr
-          [:td "mempool size"]
-          [:td (count (@state :mempool))]]
-         [:tr
-          [:td "difficulty"]
-          [:td 0]]
-         [:tr
-          [:td "fee range"]
-          [:td 0 " -> " 0]]
-         [:tr
-          [:td "block epoch"]
-          [:td (get-in @state [:blockchain 0 :epoch])]]]]
+         [:tbody
+          [:tr
+           [:td "peers"]
+           [:td 0]]
+          [:tr
+           [:td "mempool size"]
+           [:td (count (@state :mempool))]]
+          [:tr
+           [:td "difficulty"]
+           [:td 0]]
+          [:tr
+           [:td "fee range"]
+           [:td 0 " -> " 0]]
+          [:tr
+           [:td "block epoch"]
+           [:td (get-in @state [:blockchain 0 :epoch])]]]]]
        [:div#blockchain
         [:h3 "blockchain history"]
-        "..."
-        ]])))
+        (for [b (@state :blockchain)]
+          [:div {:key (fingerprint (b :pow))}
+           [:pre (fingerprint (b :pow))]
+           (if (= (b :previous-hash) 0x1)
+             [:pre "genesis block"]
+             (for [t (b :transactions)]
+               [:pre (str t)]))])]])))
 
 ;; -------------------------
 ;; Initialize app
