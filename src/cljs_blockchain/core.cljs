@@ -82,7 +82,7 @@
           (= (.-length to) 32)
           (= (.-length from) 32)
           (> amount 0))
-      (update-in new-state [:mempool] conj {:to to :from from :amount amount})
+      (update-in new-state [:mempool] conj {:to to :from from :amount amount :fee 0})
       new-state)))
 
 (defn process-event [new-state event]
@@ -116,10 +116,20 @@
 ;; -------------------------
 ;; Views
 
+(defn submit-transaction [state interface]
+  (put! (@state :incoming) {:add-transaction
+                            {:to (@interface :to)
+                             :from (pk @state)
+                             :amount (int (@interface :amount))
+                             :fee (int (@interface :fee))}})
+  (reset! interface {}))
+
 (defn home-page [state]
   ; TODO: transaction validation
-  (let [to (r/atom "")
-        amount (r/atom "")]
+  (let [interface (r/atom {})
+        to (r/cursor interface [:to])
+        amount (r/cursor interface [:amount])
+        fee (r/cursor interface [:fee])]
     (fn []
       [:div
        [:div#header
@@ -133,9 +143,10 @@
        [:div#ui
         [:h3 "make transaction"]
         [:input {:placeholder "to public key" :on-change #(reset! to (-> % .-target .-value)) :value @to}]
-        [:input {:placeholder "amount" :on-change #(reset! amount (-> % .-target .-value)) :value @amount}]
+        [:input {:placeholder "amount" :type "number" :on-change #(reset! amount (-> % .-target .-value)) :value @amount}]
+        [:input {:placeholder "fee" :type "number" :on-change #(reset! fee (-> % .-target .-value)) :value @fee}]
         ; [:input {:placeholder "message"}]
-        [:button {:on-click #(put! (@state :incoming) {:add-transaction {:to @to :from (pk @state) :amount (int @amount)}})} "Send"]]
+        [:button {:on-click (partial submit-transaction state interface)} "Send"]]
        [:div#mining
         [:h3 "mining"]
         [:button "mine a block"]]
@@ -143,11 +154,17 @@
         [:h3 "stats"]
         [:table
          [:tr
+          [:td "peers"]
+          [:td 0]]
+         [:tr
           [:td "mempool size"]
           [:td (count (@state :mempool))]]
          [:tr
           [:td "difficulty"]
           [:td 0]]
+         [:tr
+          [:td "fee range"]
+          [:td 0 " -> " 0]]
          [:tr
           [:td "block epoch"]
           [:td (get-in @state [:blockchain 0 :epoch])]]]]
