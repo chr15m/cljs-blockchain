@@ -75,16 +75,6 @@
      :nonce 0
      :previous-hash previous-hash}))
 
-;*** crypto ***;
-
-(defn ensure-keypair! []
-  (let [k (cljs.reader/read-string (.getItem storage "secret-key"))
-        k (if k (nacl.sign.keyPair.fromSecretKey (js/Uint8Array. k)) (nacl.sign.keyPair))]
-    (.setItem storage "secret-key" (prn-str (js/Array.from (.-secretKey k))))
-    k))
-
-;*** main event loop ***;
-
 (defn add-block-to-blockchain [new-state]
   ; split top ten transactions by fee off mempool
   (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
@@ -111,6 +101,16 @@
           (> amount 0))
       (update-in new-state [:mempool] conj {:to to :from from :amount amount :fee 0})
       new-state)))
+
+;*** crypto ***;
+
+(defn ensure-keypair! []
+  (let [k (cljs.reader/read-string (.getItem storage "secret-key"))
+        k (if k (nacl.sign.keyPair.fromSecretKey (js/Uint8Array. k)) (nacl.sign.keyPair))]
+    (.setItem storage "secret-key" (prn-str (js/Array.from (.-secretKey k))))
+    k))
+
+;*** main event loop ***;
 
 (defn process-event [new-state event]
   (cond
