@@ -58,17 +58,22 @@
    ; somebody can generate an entire epoch worth of blocks
    ; for some future block, winning all mining rewards for the block
    ; because the following value is deterministic and predictable
-   :pow (nacl.hash (js/Uint8Array. (str "cljs-blockchain #" (compute-epoch t))))
+   :pow (nacl.hash (js/Uint8Array.from (str "cljs-blockchain #" (compute-epoch t))))
    :nonce 0
    :previous-hash 0x1})
 
 (defn blockchain-make-block [t transactions previous-hash]
-  {:timestamp t
-   :transactions transactions
-   :epoch (compute-epoch t)
-   :pow (nacl.hash (js/Uint8Array. (str (to-hex previous-hash) "hello")))
-   :nonce 0
-   :previous-hash previous-hash})
+  (let [new-hash (-> previous-hash
+                     (to-hex)
+                     (str "-next")
+                     (js/Uint8Array.from)
+                     (nacl.hash))]
+    {:timestamp t
+     :transactions transactions
+     :epoch (compute-epoch t)
+     :pow new-hash
+     :nonce 0
+     :previous-hash previous-hash}))
 
 ;*** crypto ***;
 
@@ -137,7 +142,7 @@
     (put! (@state :incoming) :update-epoch)))
 
 ;; -------------------------
-;; Views
+;; User interface
 
 (defn submit-transaction [state interface]
   (put! (@state :incoming) {:add-transaction
