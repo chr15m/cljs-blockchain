@@ -102,6 +102,9 @@
       (update-in new-state [:mempool] conj {:to to :from from :amount amount :fee 0})
       new-state)))
 
+(defn transaction-hash [t]
+  (nacl.hash (Uint8Array.from (bencode/encode (clj->js t)))))
+
 ;*** crypto ***;
 
 (defn ensure-keypair! []
