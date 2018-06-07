@@ -11,11 +11,12 @@
     [cljs.core.async.macros :refer [go go-loop]]))
 
 ; TODO:
-; * add index to blocks
+; * remove epoch code
+; * validate blockchain when a block is added
+; * compute POW at mining stage
 ; * block headers: version, previous-block-hash, transaction-merkle-root-hash, timestamp, difficulty, nonce
 ;   https://en.bitcoin.it/wiki/Block_hashing_algorithm
 ; * sign transactions
-; * include nonce in coinbase transaction (to update merkle root)
 
 (defonce state (r/atom {:incoming (chan)}))
 
