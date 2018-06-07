@@ -205,13 +205,16 @@
            [:td (get-in @state [:blockchain 0 :epoch])]]]]]
        [:div#blockchain
         [:h3 "blockchain history"]
-        (for [b (@state :blockchain)]
-          [:div {:key (fingerprint (b :pow))}
-           [:pre (fingerprint (b :pow))]
+        (for [b (reverse (@state :blockchain))]
+          [:div.block {:key (fingerprint (b :pow))}
+           [:strong "block: " (fingerprint (b :pow))]
            (if (= (b :previous-hash) 0x1)
-             [:pre "genesis block"]
+             [:div.transaction "genesis block"]
              (for [t (b :transactions)]
-               [:pre (str t)]))])]])))
+               [:div.transaction {:key (fingerprint (transaction-hash t))}
+                [:div (fingerprint (t :to)) " -> " (fingerprint (t :from))
+                 [:span.amount (t :amount)]
+                 [:span.fee "fee: " (t :fee)]]]))])]])))
 
 ;; -------------------------
 ;; Initialize app

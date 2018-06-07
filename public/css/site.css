@@ -57,3 +57,19 @@ table {
 td {
   border-bottom: 2px dashed #888;
 }
+
+.block {
+  margin-bottom: 1em;
+}
+
+.transaction {
+  margin-left: 1em;
+}
+
+.transaction .amount {
+  font-weight: bold;
+}
+
+.transaction .amount, .transaction .fee {
+  margin: 0 0.5em;
+}
