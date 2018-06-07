@@ -94,7 +94,7 @@
         (update-in [:blockchain] conj (blockchain-make-block (now) transactions previous-hash new-index))
         (assoc :mempool mempool-remaining))))
 
-(defn add-transaction-to-mempool [new-state {:keys [to from amount]}]
+(defn add-transaction-to-mempool [new-state {:keys [to from amount fee]}]
   (print "adding transaction:" to from amount)
   ; TODO: regex check to is hex
   ; TODO: regex check from is hex
@@ -109,7 +109,7 @@
           (= (.-length to) 32)
           (= (.-length from) 32)
           (> amount 0))
-      (update-in new-state [:mempool] conj {:to to :from from :amount amount :fee 0})
+      (update-in new-state [:mempool] conj {:to to :from from :amount amount :fee fee})
       new-state)))
 
 (defn transaction-hash [t]
