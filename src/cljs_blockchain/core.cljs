@@ -67,9 +67,10 @@
    ; because the following value is deterministic and predictable
    :pow (nacl.hash (js/Uint8Array.from (str "cljs-blockchain #" (compute-epoch t))))
    :nonce 0
+   :index 0
    :previous-hash 0x1})
 
-(defn blockchain-make-block [t transactions previous-hash]
+(defn blockchain-make-block [t transactions previous-hash new-index]
   (let [new-hash (-> previous-hash
                      (to-hex)
                      (str "-next")
@@ -80,15 +81,17 @@
      :epoch (compute-epoch t)
      :pow new-hash
      :nonce 0
+     :index new-index
      :previous-hash previous-hash}))
 
 (defn add-block-to-blockchain [new-state]
   ; split top ten transactions by fee off mempool
   (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
         [transactions mempool-remaining] (split-at 10 mempool-by-fee)
-        previous-hash (-> new-state :blockchain (last) :pow)]
+        previous-hash (-> new-state :blockchain (last) :pow)
+        new-index (-> new-state :blockchain (count))]
     (-> new-state
-        (update-in [:blockchain] conj (blockchain-make-block (now) transactions previous-hash))
+        (update-in [:blockchain] conj (blockchain-make-block (now) transactions previous-hash new-index))
         (assoc :mempool mempool-remaining))))
 
 (defn add-transaction-to-mempool [new-state {:keys [to from amount]}]
@@ -214,7 +217,7 @@
         [:h3 "blockchain history"]
         (for [b (reverse (@state :blockchain))]
           [:div.block {:key (fingerprint (b :pow))}
-           [:strong "block: " (fingerprint (b :pow))]
+           [:strong "block: " (fingerprint (b :pow)) " (" (inc (b :index)) ")"]
            (if (= (b :previous-hash) 0x1)
              [:div.transaction "genesis block"]
              (for [t (b :transactions)]
