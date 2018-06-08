@@ -11,12 +11,13 @@
     [cljs.core.async.macros :refer [go go-loop]]))
 
 ; TODO:
-; * uses localStorage window storage event to pass transactions and blocks around
+; * use localStorage window storage event to pass transactions and blocks around
+; * validate transactions when added
 ; * validate blockchain when a block is added
 ; * compute POW at mining stage
 ; * block headers: version, previous-block-hash, transaction-merkle-root-hash, timestamp, difficulty, nonce
 ;   https://en.bitcoin.it/wiki/Block_hashing_algorithm
-; * sign transactions
+; * new hash: hash(previousHash + timestamp + JSON.stringify(transactions) + nonce)
 
 (defonce state (r/atom {:incoming (chan)}))
 
@@ -90,15 +91,25 @@
   ; TODO: regex check amount is number
   (let [to (from-hex to)
         from (from-hex from)
-        amount (int amount)]
-    (print (bencode/encode #js {:to to :from from :amount amount}))
+        amount (int amount)
+        transaction {:to to :from from :amount amount :fee fee}
+        signature (nacl.sign.detached
+                    (->> transaction
+                         (clj->js)
+                         (bencode/encode)
+                         (Uint8Array.from))
+                    (-> new-state
+                        :keypair
+                        (or #js {})
+                        (.. -secretKey)))
+        transaction (assoc transaction :signature signature)]
     ; TODO: also check balance
     ; TODO: also check from address is own
     (if (and
           (= (.-length to) 32)
           (= (.-length from) 32)
           (> amount 0))
-      (update-in new-state [:mempool] conj {:to to :from from :amount amount :fee fee})
+      (update-in new-state [:mempool] conj transaction)
       new-state)))
 
 (defn transaction-hash [t]
@@ -203,7 +214,8 @@
                [:div.transaction {:key (fingerprint (transaction-hash t))}
                 [:div (fingerprint (t :to)) " -> " (fingerprint (t :from))
                  [:span.amount (t :amount)]
-                 [:span.fee "fee: " (t :fee)]]]))])]])))
+                 [:span.fee "fee: " (t :fee)]
+                 [:span.signature "signature: " (fingerprint (t :signature))]]]))])]])))
 
 ;; -------------------------
 ;; Initialize app
