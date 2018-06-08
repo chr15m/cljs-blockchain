@@ -11,7 +11,7 @@
     [cljs.core.async.macros :refer [go go-loop]]))
 
 ; TODO:
-; * remove epoch code
+; * uses localStorage window storage event to pass transactions and blocks around
 ; * validate blockchain when a block is added
 ; * compute POW at mining stage
 ; * block headers: version, previous-block-hash, transaction-merkle-root-hash, timestamp, difficulty, nonce
@@ -28,12 +28,6 @@
 
 (defn now []
   (-> (js/Date.) (.getTime)))
-
-(defn compute-epoch [t]
-  (-> t (/ ms-per-day) (int)))
-
-(defn has-epoch-changed [epoch blockchain]
-  (not= epoch (get-in blockchain [0 :epoch])))
 
 ;*** data manipulation ***;
 
@@ -61,12 +55,7 @@
 (defn blockchain-make-genesis-block [t]
   {:timestamp 0
    :transactions #{}
-   :epoch (compute-epoch t)
-   ; one reason why you should not use this for anything serious:
-   ; somebody can generate an entire epoch worth of blocks
-   ; for some future block, winning all mining rewards for the block
-   ; because the following value is deterministic and predictable
-   :pow (nacl.hash (js/Uint8Array.from (str "cljs-blockchain #" (compute-epoch t))))
+   :pow (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw")))
    :nonce 0
    :index 0
    :previous-hash 0x1})
@@ -79,7 +68,6 @@
                      (nacl.hash))]
     {:timestamp t
      :transactions transactions
-     :epoch (compute-epoch t)
      :pow new-hash
      :nonce 0
      :index new-index
@@ -137,10 +125,8 @@
     (let [new-state old-state
           ; wait for events
           event (<! (new-state :incoming))
-          ; compute current epoch
-          current-epoch (compute-epoch (now))
           ; ensure blockchain structure
-          new-state (update-in new-state [:blockchain] #(if (has-epoch-changed current-epoch %) [] %))
+          new-state (update-in new-state [:blockchain] #(if (nil? %) [] %))
           ; ensure genesis block
           new-state (update-in new-state [:blockchain 0] #(or % (blockchain-make-genesis-block (now))))
           ; ensure mempool structure
@@ -150,10 +136,6 @@
           new-state (try (process-event new-state event) (catch :default e (do (js/console.error e) new-state)))]
       (js/console.log "main-loop new-state:" (clj->js new-state))
       new-state)))
-
-(defn check-epoch [state]
-  (when (has-epoch-changed (compute-epoch (now)) (@state :blockchain))
-    (put! (@state :incoming) :update-epoch)))
 
 ;; -------------------------
 ;; User interface
@@ -179,8 +161,7 @@
       [:div
        [:div#header
         [:h2 "cljs-blockchain"]
-        [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]
-        [:p [:small "this blockchain resets every 24 hrs, deleting all history."]]]
+        [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]]
        [:div#user
         [:h3 "wallet"]
         [:p "public key: " [:code (pk @state)]]
@@ -210,10 +191,7 @@
            [:td 0]]
           [:tr
            [:td "fee range"]
-           [:td 0 " -> " 0]]
-          [:tr
-           [:td "block epoch"]
-           [:td (get-in @state [:blockchain 0 :epoch])]]]]]
+           [:td 0 " -> " 0]]]]]
        [:div#blockchain
         [:h3 "blockchain history"]
         (for [b (reverse (@state :blockchain))]
@@ -238,7 +216,5 @@
   (swap! state assoc :keypair (ensure-keypair!))
   ; app state mutation happens here
   (go-loop [] (reset! state (<! (main-loop @state))) (recur))
-  ; check for blockchain epoch change (reset chain daily) every second
-  (js/setInterval #(check-epoch state) 1000)
   (mount-root))
 
