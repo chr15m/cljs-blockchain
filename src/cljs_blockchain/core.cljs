@@ -15,9 +15,6 @@
 ; * validate transactions when added
 ; * validate blockchain when a block is added
 ; * compute POW at mining stage
-; * block headers: version, previous-block-hash, transaction-merkle-root-hash, timestamp, difficulty, nonce
-;   https://en.bitcoin.it/wiki/Block_hashing_algorithm
-; * new hash: hash(previousHash + timestamp + JSON.stringify(transactions) + nonce)
 
 (defonce state (r/atom {:incoming (chan)}))
 
@@ -65,15 +62,15 @@
    :previous-hash 0x1})
 
 (defn blockchain-make-block [t transactions previous-hash new-index]
-  (let [new-hash (-> previous-hash
-                     (to-hex)
-                     (str "-next")
-                     (js/Uint8Array.from)
-                     (nacl.hash))]
+  (let [nonce (nacl.randomBytes 8)
+        new-hash (hash-object [(to-hex previous-hash)
+                               t
+                               (to-hex (hash-object transactions))
+                               (to-hex nonce)])]
     {:timestamp t
      :transactions transactions
      :pow new-hash
-     :nonce 0
+     :nonce nonce
      :index new-index
      :previous-hash previous-hash}))
 
