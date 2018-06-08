@@ -56,7 +56,7 @@
 (defn blockchain-make-genesis-block [t]
   {:timestamp 0
    :transactions #{}
-   :pow (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw")))
+   :hash (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw")))
    :nonce 0
    :index 0
    :previous-hash 0x1})
@@ -69,7 +69,7 @@
                                (to-hex nonce)])]
     {:timestamp t
      :transactions transactions
-     :pow new-hash
+     :hash new-hash
      :nonce nonce
      :index new-index
      :previous-hash previous-hash}))
@@ -78,7 +78,7 @@
   ; split top ten transactions by fee off mempool
   (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
         [transactions mempool-remaining] (split-at 10 mempool-by-fee)
-        previous-hash (-> new-state :blockchain (last) :pow)
+        previous-hash (-> new-state :blockchain (last) :hash)
         new-index (-> new-state :blockchain (count))]
     (-> new-state
         (update-in [:blockchain] conj (blockchain-make-block (now) transactions previous-hash new-index))
@@ -203,8 +203,8 @@
        [:div#blockchain
         [:h3 "blockchain history"]
         (for [b (reverse (@state :blockchain))]
-          [:div.block {:key (fingerprint (b :pow))}
-           [:strong "block: " (fingerprint (b :pow)) " (" (inc (b :index)) ")"]
+          [:div.block {:key (fingerprint (b :hash))}
+           [:strong "block: " (fingerprint (b :hash)) " (" (inc (b :index)) ")"]
            (if (= (b :previous-hash) 0x1)
              [:div.transaction "genesis block"]
              (for [t (b :transactions)]
