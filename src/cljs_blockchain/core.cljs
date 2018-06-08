@@ -51,6 +51,9 @@
       (or #js [])
       (to-hex)))
 
+(defn hash-object [t]
+  (nacl.hash (Uint8Array.from (bencode/encode (clj->js t)))))
+
 ;*** blockchain ***;
 
 (defn blockchain-make-genesis-block [t]
@@ -111,9 +114,6 @@
           (> amount 0))
       (update-in new-state [:mempool] conj transaction)
       new-state)))
-
-(defn transaction-hash [t]
-  (nacl.hash (Uint8Array.from (bencode/encode (clj->js t)))))
 
 ;*** crypto ***;
 
@@ -211,7 +211,7 @@
            (if (= (b :previous-hash) 0x1)
              [:div.transaction "genesis block"]
              (for [t (b :transactions)]
-               [:div.transaction {:key (fingerprint (transaction-hash t))}
+               [:div.transaction {:key (fingerprint (hash-object t))}
                 [:div (fingerprint (t :to)) " -> " (fingerprint (t :from))
                  [:span.amount (t :amount)]
                  [:span.fee "fee: " (t :fee)]
