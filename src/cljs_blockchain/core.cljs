@@ -1,14 +1,11 @@
 (ns cljs-blockchain.core
   (:require
     [cljs.reader] 
-    [cljs.core.async :refer [chan <! timeout put!]]
     ["bencode-js/lib/index" :as bencode]
     ["scrypt-js/scrypt" :as scrypt]
     [cljsjs.webtorrent :as wt]
     [cljsjs.nacl-fast :as nacl]
-    [reagent.core :as r])
-  (:require-macros
-    [cljs.core.async.macros :refer [go go-loop]]))
+    [reagent.core :as r]))
 
 ; TODO:
 ; * use localStorage window storage event to pass transactions and blocks around
@@ -69,14 +66,21 @@
      :index new-index
      :previous-hash previous-hash}))
 
-(defn add-block-to-blockchain [new-state]
+(defn mine-block [new-state]
   ; split top ten transactions by fee off mempool
   (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
         [transactions mempool-remaining] (split-at 10 mempool-by-fee)
         previous-hash (-> new-state :blockchain (last) :hash)
-        new-index (-> new-state :blockchain (count))]
+        new-index (-> new-state :blockchain (count))
+        new-block (loop [c 0]
+                    (let [candidate-block (blockchain-make-block (now) transactions previous-hash new-index)]
+                      ; (js/console.log "candidate-block" c (clj->js candidate-block))
+                      ; find a block with one byte of leading zeros (fixed difficulty)
+                      (if (not= (aget (candidate-block :hash) 0) 0)
+                        (recur (inc c))
+                          candidate-block)))]
     (-> new-state
-        (update-in [:blockchain] conj (blockchain-make-block (now) transactions previous-hash new-index))
+        (update-in [:blockchain] conj new-block)
         (assoc :mempool mempool-remaining))))
 
 (defn add-transaction-to-mempool [new-state {:keys [to from amount fee]}]
@@ -126,15 +130,18 @@
           :fee (int (@interface :fee))})
   (reset! interface {}))
 
-(defn submit-block! [state]
-  (swap! state add-block-to-blockchain))
+(defn submit-block! [state miner-ui]
+  (reset! miner-ui "Mining a block...")
+  (swap! state mine-block)
+  (reset! miner-ui (str "Found block: " (-> @state :blockchain last :hash (fingerprint)))))
 
 (defn home-page [state]
   ; TODO: transaction validation
   (let [interface (r/atom {})
         to (r/cursor interface [:to])
         amount (r/cursor interface [:amount])
-        fee (r/cursor interface [:fee])]
+        fee (r/cursor interface [:fee])
+        miner-ui (r/cursor interface [:miner])]
     (fn []
       [:div
        [:div#header
@@ -153,7 +160,8 @@
         [:button {:on-click (partial submit-transaction! state interface)} "Send"]]
        [:div#mining
         [:h3 "mining"]
-        [:button {:on-click (partial submit-block! state)} "mine a block"]]
+        [:button {:on-click (partial submit-block! state miner-ui)} "mine a block"]
+        [:span#mining @miner-ui]]
        [:div#stats
         [:h3 "stats"]
         [:table
