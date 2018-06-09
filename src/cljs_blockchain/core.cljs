@@ -60,12 +60,20 @@
     (hash-object datastructure)
     (.. keypair -secretKey)))
 
+(defn check-datastructure-signature [pk datastructure]
+  (let [signature (datastructure :signature)
+        datastructure (dissoc datastructure :signature)]
+    (nacl.sign.detached.verify
+      (hash-object datastructure)
+      signature
+      pk)))
+
 ;*** blockchain ***;
 
 (def genesis-hash
   (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
 
-(defn compute-block-hash [previous-hash t transactions-hash nonce]
+(defn compute-block-hash [t transactions previous-hash nonce]
   (hash-object [(to-hex previous-hash)
                 t
                 (to-hex (hash-object transactions))
@@ -74,7 +82,7 @@
 (defn make-block [t transactions previous-hash new-index nonce]
   {:timestamp t
    :transactions transactions
-   :hash (compute-block-hash previous-hash t transactions-hash nonce)
+   :hash (compute-block-hash t transactions previous-hash nonce)
    :nonce nonce
    :index new-index
    :previous-hash previous-hash})
@@ -98,19 +106,20 @@
                    :else 0))]
     (apply + ledger)))
 
-(defn is-valid-transaction [transaction]
-  ; TODO: check balance
-  ; TODO: check from address is own
-  ; TODO: check signature
+(defn is-valid-transaction [state-val transaction]
   (and
-        (= (.-length (transaction :to)) 32)
-        (= (.-length (transaction :from)) 32)
-        (> (transaction :amount) 0)))
+    (= (.-length (transaction :to)) 32)
+    (= (.-length (transaction :from)) 32)
+    (> (transaction :amount) 0)
+    (<= (+ (transaction :amount) (transaction :fee)) (compute-balance state-val (to-hex (transaction :from))))
+    (check-datastructure-signature (transaction :from) transaction)))
 
 (defn is-valid-block [block previous-block]
-  ; TODO: check all transactions in block
-  ; TODO: check hash
   ; TODO: check index
+  ; TODO: check all transactions in block
+  ; TODO: check hash matches
+  ; TODO: check pow
+  ; TODO: check coinbase sums feeds + bonus
   (or
     (= block (make-genesis-block))
     true))
@@ -123,7 +132,7 @@
     state-val))
 
 (defn add-transaction-to-mempool [state-val transaction]
-  (if (is-valid-transaction transaction) 
+  (if (is-valid-transaction state-val transaction) 
     (update-in state-val [:mempool] conj transaction)
     state-val))
 
@@ -202,7 +211,6 @@
         [:input {:placeholder "to public key" :on-change #(reset! to (.replace (-> % .-target .-value) #"[^A-Fa-f0-9]" "")) :value @to}]
         [:input {:placeholder "amount" :on-change #(reset! amount (.replace (-> % .-target .-value) #"[^0-9]" "")) :value @amount}]
         [:input {:placeholder "fee" :on-change #(reset! fee (.replace (-> % .-target .-value) #"[^0-9]" "")) :value (or @fee (fee-calc @state median nil))}]
-        ; [:input {:placeholder "message"}]
         [:button {:on-click (partial submit-transaction! state interface)} "Send"]]
        [:div#mining
         [:h3 "mining"]
