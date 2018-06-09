@@ -11,6 +11,8 @@
 ; * use localStorage window storage event to pass transactions and blocks around
 ; * validate transactions when added
 ; * validate blockchain when a block is added
+; * add coinbase transaction
+; * function to compute total
 ; * compute POW at mining stage
 
 (defonce state (r/atom {}))
@@ -51,7 +53,20 @@
 (def genesis-hash
   (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
 
+;*** crypto ***;
+
+(defn ensure-keypair! []
+  (let [k (cljs.reader/read-string (.getItem storage "secret-key"))
+        k (if k (nacl.sign.keyPair.fromSecretKey (js/Uint8Array. k)) (nacl.sign.keyPair))]
+    (.setItem storage "secret-key" (prn-str (js/Array.from (.-secretKey k))))
+    k))
+
 ;*** blockchain ***;
+
+(defn fee-calc [state f default]
+  (or
+    (apply f (map :fee (state :mempool)))
+    default))
 
 (defn blockchain-make-block [t transactions previous-hash new-index]
   (let [nonce (nacl.randomBytes 8)
@@ -111,14 +126,6 @@
       (update-in new-state [:mempool] conj transaction)
       new-state)))
 
-;*** crypto ***;
-
-(defn ensure-keypair! []
-  (let [k (cljs.reader/read-string (.getItem storage "secret-key"))
-        k (if k (nacl.sign.keyPair.fromSecretKey (js/Uint8Array. k)) (nacl.sign.keyPair))]
-    (.setItem storage "secret-key" (prn-str (js/Array.from (.-secretKey k))))
-    k))
-
 ;; -------------------------
 ;; User interface
 
@@ -155,7 +162,7 @@
         [:h3 "make transaction"]
         [:input {:placeholder "to public key" :on-change #(reset! to (-> % .-target .-value)) :value @to}]
         [:input {:placeholder "amount" :type "number" :on-change #(reset! amount (-> % .-target .-value)) :value @amount}]
-        [:input {:placeholder "fee" :type "number" :on-change #(reset! fee (-> % .-target .-value)) :value @fee}]
+        [:input {:placeholder "fee" :type "number" :on-change #(reset! fee (-> % .-target .-value)) :value (or @fee (fee-calc @state max nil))}]
         ; [:input {:placeholder "message"}]
         [:button {:on-click (partial submit-transaction! state interface)} "Send"]]
        [:div#mining
@@ -163,21 +170,15 @@
         [:button {:on-click (partial submit-block! state miner-ui)} "mine a block"]
         [:span#mining @miner-ui]]
        [:div#stats
-        [:h3 "stats"]
+        [:h3 "mempool"]
         [:table
          [:tbody
-          [:tr
-           [:td "peers"]
-           [:td 0]]
           [:tr
            [:td "mempool size"]
            [:td (count (@state :mempool))]]
           [:tr
-           [:td "difficulty"]
-           [:td 0]]
-          [:tr
-           [:td "fee range"]
-           [:td 0 " -> " 0]]]]]
+           [:td "mempool fee range"]
+           [:td (fee-calc @state min 0) " -> " (fee-calc @state max 0)]]]]]
        [:div#blockchain
         [:h3 "blockchain history"]
         (for [b (reverse (@state :blockchain))]
