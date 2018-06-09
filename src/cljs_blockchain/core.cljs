@@ -99,10 +99,8 @@
         signature (sign-datastructure keypair transaction)]
     (assoc transaction :signature signature)))
 
-(defn compute-balance [state-val address]
-  (let [transactions (for [block (state-val :blockchain) transaction (block :transactions)] transaction)
-        transactions (concat transactions (state-val :mempool))
-        ledger (for [transaction transactions]
+(defn compute-balance [transactions address]
+  (let [ledger (for [transaction transactions]
                  (cond
                    (= (to-hex (transaction :from)) (to-hex (transaction :to))) (* -1 (transaction :fee))
                    (= (to-hex (transaction :from)) address) (* -1 (+ (transaction :amount) (transaction :fee)))
@@ -110,12 +108,15 @@
                    :else 0))]
     (apply + ledger)))
 
-(defn is-valid-transaction [state-val transaction]
+(defn blockchain-transactions [blockchain]
+  (for [block blockchain transaction (block :transactions)] transaction))
+
+(defn is-valid-transaction [transactions transaction]
   (and
     (= (.-length (transaction :to)) 32)
     (= (.-length (transaction :from)) 32)
     (> (transaction :amount) 0)
-    (<= (+ (transaction :amount) (transaction :fee)) (compute-balance state-val (to-hex (transaction :from))))
+    (<= (+ (transaction :amount) (transaction :fee)) (compute-balance transactions (to-hex (transaction :from))))
     (check-datastructure-signature (transaction :from) transaction)))
 
 (defn is-valid-block [block previous-block]
@@ -136,7 +137,7 @@
     state-val))
 
 (defn add-transaction-to-mempool [state-val transaction]
-  (if (is-valid-transaction state-val transaction) 
+  (if (is-valid-transaction (concat (blockchain-transactions (state-val :blockchain)) (state-val :mempool)) transaction)
     (update-in state-val [:mempool] conj transaction)
     state-val))
 
@@ -202,7 +203,7 @@
         fee (r/cursor interface [:fee])
         miner-ui (r/cursor interface [:miner])]
     (fn []
-      (let [balance (compute-balance @state (pk @state))]
+      (let [balance (compute-balance (concat (blockchain-transactions (@state :blockchain)) (@state :mempool)) (pk @state))]
         [:div
          [:div#header
           [:h2 "cljs-blockchain"]
