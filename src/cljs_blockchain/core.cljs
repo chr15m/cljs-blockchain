@@ -208,6 +208,31 @@
     (apply f (map :fee (state-val :mempool)))
     default))
 
+;*** "network" ***;
+
+(defn serializer [k v]
+  (cond
+    (= (type v) js/Uint8Array) (str "0x" (to-hex v))
+    :else v))
+
+(defn deserializer [k v]
+  (cond
+    (and (= (type v) js/String) (.substr v 0 2)) (from-hex (.substr v 2))
+    :else v))
+
+(defn send-message [kind message]
+  (.setItem storage kind (-> message clj->js (js/JSON.stringify serializer)))
+  (.setItem storage kind nil))
+
+(defn receive [state ev]
+  (let [kind (aget ev "key")
+        message (-> (aget ev "newValue") (js/JSON.parse deserializer) (js->clj :keywordize-keys true))]
+    (when message
+      (print "got:" kind)
+      (case kind
+        "blockchain" (swap! state resolve-blockchain-conflict message)
+        "transaction" (swap! state add-transaction-to-mempool message)))))
+
 ;; -------------------------
 ;; User interface
 
@@ -218,13 +243,15 @@
                       (pk @state)
                       (int (@interface :amount))
                       (int (@interface :fee)))]
-    (swap! state add-transaction-to-mempool transaction))
+    (swap! state add-transaction-to-mempool transaction)
+    (send-message "transaction" transaction))
   (reset! interface {}))
 
 (defn submit-block! [state miner-ui]
   (reset! miner-ui "Mining a block...")
   (let [new-block (mine-block @state)]
     (swap! state add-block-to-blockchain new-block))
+  (send-message "blockchain" (@state :blockchain))
   (reset! miner-ui (str "Found block: " (-> @state :blockchain last :hash (fingerprint)))))
 
 (defn copy-pk []
@@ -234,7 +261,6 @@
     (.execCommand js/document "copy")))
 
 (defn home-page [state]
-  ; TODO: transaction validation
   (let [interface (r/atom {})
         to (r/cursor interface [:to])
         amount (r/cursor interface [:amount])
@@ -295,6 +321,7 @@
          :keypair (make-keypair)
          :blockchain [(make-genesis-block)]
          :mempool #{})
+  (.addEventListener js/window "storage" (partial receive state) false)
   ; app state mutation happens here
   (mount-root))
 
