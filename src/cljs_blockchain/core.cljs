@@ -8,7 +8,6 @@
     [reagent.core :as r]))
 
 ; TODO:
-; * link to open window
 ; * links: source code, resume
 ; * logo
 
@@ -271,7 +270,8 @@
         [:div
          [:div#header
           [:h2 "cljs-blockchain"]
-          [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]]
+          [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]
+          [:p [:a {:href "" :target "_blank"} "open multiple tabs to simulate network peers"] "."]]
          [:div#user
           [:h3 "wallet"]
           [:p "public key: " [:input#pk {:value (pk @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
