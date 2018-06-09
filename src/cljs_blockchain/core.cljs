@@ -150,11 +150,15 @@
         (= (count (remove #(is-valid-transaction (blockchain-transactions blockchain) %) transactions)) 0)
         (is-valid-coinbase-transaction coinbase-transaction block)))))
 
+(defn remove-blockchain-transactions-from-mempool [state-val]
+  (update-in state-val [:mempool]
+             (clojure.set/difference (set (blockchain-transactions (state-val :blockchain))))))
+
 (defn add-block-to-blockchain [state-val new-block]
   (if (is-valid-block new-block (state-val :blockchain))
     (-> state-val
         (update-in [:blockchain] conj new-block)
-        (assoc :mempool (clojure.set/difference (state-val :mempool) (set (new-block :transactions)))))
+        (remove-blockchain-transactions-from-mempool))
     state-val))
 
 (defn add-transaction-to-mempool [state-val transaction]
