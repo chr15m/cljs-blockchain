@@ -8,10 +8,10 @@
     [reagent.core :as r]))
 
 ; TODO:
-; * UI disable button if invalid values
-; * validate transactions when added
 ; * validate blockchain when a block is added
-; * use localStorage window storage event to pass transactions and blocks around
+; * use localStorage window storage event to pass transactions and blockchains around
+; * links: source code, resume
+; * logo
 
 (defonce state (r/atom {}))
 
@@ -198,47 +198,48 @@
         fee (r/cursor interface [:fee])
         miner-ui (r/cursor interface [:miner])]
     (fn []
-      [:div
-       [:div#header
-        [:h2 "cljs-blockchain"]
-        [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]]
-       [:div#user
-        [:h3 "wallet"]
-        [:p "public key: " [:input#pk {:value (pk @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
-        [:p "balance: " (compute-balance @state (pk @state))]]
-       [:div#ui
-        [:h3 "make transaction"]
-        [:input {:placeholder "to public key" :on-change #(reset! to (.replace (-> % .-target .-value) #"[^A-Fa-f0-9]" "")) :value @to}]
-        [:input {:placeholder "amount" :on-change #(reset! amount (.replace (-> % .-target .-value) #"[^0-9]" "")) :value @amount}]
-        [:input {:placeholder "fee" :on-change #(reset! fee (.replace (-> % .-target .-value) #"[^0-9]" "")) :value (or @fee (fee-calc @state median nil))}]
-        [:button {:on-click (partial submit-transaction! state interface)} "Send"]]
-       [:div#mining
-        [:h3 "mining"]
-        [:button {:on-click (partial submit-block! state miner-ui)} "mine a block"]
-        [:span#mining @miner-ui]]
-       [:div#stats
-        [:h3 "mempool"]
-        [:table
-         [:tbody
-          [:tr
-           [:td "mempool size"]
-           [:td (count (@state :mempool))]]
-          [:tr
-           [:td "mempool fee range"]
-           [:td (fee-calc @state min 0) " -> " (fee-calc @state max 0)]]]]]
-       [:div#blockchain
-        [:h3 "blockchain history"]
-        (for [b (reverse (@state :blockchain))]
-          [:div.block {:key (fingerprint (b :hash))}
-           [:strong "block: " (fingerprint (b :hash)) " (" (inc (b :index)) ")"]
-           (if (= (b :index) 0)
-             [:div.transaction "genesis block"]
-             (for [t (b :transactions)]
-               [:div.transaction {:key (fingerprint (hash-object t))}
-                [:div (fingerprint (t :from)) " -> " (fingerprint (t :to))
-                 [:span.amount (t :amount)]
-                 [:span.fee "fee: " (t :fee)]
-                 [:span.signature "signature: " (fingerprint (t :signature))]]]))])]])))
+      (let [balance (compute-balance @state (pk @state))]
+        [:div
+         [:div#header
+          [:h2 "cljs-blockchain"]
+          [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]]
+         [:div#user
+          [:h3 "wallet"]
+          [:p "public key: " [:input#pk {:value (pk @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
+          [:p "balance: " balance]]
+         [:div#ui
+          [:h3 "make transaction"]
+          [:input {:placeholder "to public key" :on-change #(reset! to (.replace (-> % .-target .-value) #"[^A-Fa-f0-9]" "")) :value @to}]
+          [:input {:placeholder "amount" :on-change #(reset! amount (.replace (-> % .-target .-value) #"[^0-9]" "")) :value @amount}]
+          [:input {:placeholder "fee" :on-change #(reset! fee (.replace (-> % .-target .-value) #"[^0-9]" "")) :value (or @fee (fee-calc @state median nil))}]
+          [:button {:on-click (partial submit-transaction! state interface) :disabled (not (and (> (int @amount) 0) (<= (+ (int @amount) (int @fee)) balance) (= (.-length (from-hex @to)) 32)))} "Send"]]
+         [:div#mining
+          [:h3 "mining"]
+          [:button {:on-click (partial submit-block! state miner-ui)} "mine a block"]
+          [:span#mining @miner-ui]]
+         [:div#stats
+          [:h3 "mempool"]
+          [:table
+           [:tbody
+            [:tr
+             [:td "mempool size"]
+             [:td (count (@state :mempool))]]
+            [:tr
+             [:td "mempool fee range"]
+             [:td (fee-calc @state min 0) " -> " (fee-calc @state max 0)]]]]]
+         [:div#blockchain
+          [:h3 "blockchain history"]
+          (for [b (reverse (@state :blockchain))]
+            [:div.block {:key (fingerprint (b :hash))}
+             [:strong "block: " (fingerprint (b :hash)) " (" (inc (b :index)) ")"]
+             (if (= (b :index) 0)
+               [:div.transaction "genesis block"]
+               (for [t (b :transactions)]
+                 [:div.transaction {:key (fingerprint (hash-object t))}
+                  [:div (fingerprint (t :from)) " -> " (fingerprint (t :to))
+                   [:span.amount (t :amount)]
+                   [:span.fee "fee: " (t :fee)]
+                   [:span.signature "signature: " (fingerprint (t :signature))]]]))])]]))))
 
 ;; -------------------------
 ;; Initialize app
