@@ -11,7 +11,6 @@
 ; * use localStorage window storage event to pass transactions and blocks around
 ; * validate transactions when added
 ; * validate blockchain when a block is added
-; * add coinbase transaction
 ; * function to compute total
 
 (defonce state (r/atom {}))
@@ -66,15 +65,6 @@
 (def genesis-hash
   (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
 
-(defn validate-transaction [transaction]
-  ; TODO: check balance
-  ; TODO: check from address is own
-  ; TODO: check signature
-  (and
-        (= (.-length (transaction :to)) 32)
-        (= (.-length (transaction :from)) 32)
-        (> (transaction :amount) 0)))
-
 (defn make-block [t transactions previous-hash new-index]
   (let [nonce (nacl.randomBytes 8)
         new-hash (hash-object [(to-hex previous-hash)
@@ -88,32 +78,57 @@
      :index new-index
      :previous-hash previous-hash}))
 
+(defn make-genesis-block []
+  (make-block 0 #{} genesis-hash 0))
+
 (defn make-transaction [keypair to from amount fee]
   (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee)}
         signature (sign-datastructure keypair transaction)]
     (assoc transaction :signature signature)))
 
-(defn mine-block [new-state]
-  ; split top ten transactions by fee off mempool
-  (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
-        [transactions mempool-remaining] (split-at 10 mempool-by-fee)
-        previous-hash (-> new-state :blockchain (last) :hash)
-        new-index (-> new-state :blockchain (count))
-        new-block (loop [c 0]
-                    (let [candidate-block (make-block (now) transactions previous-hash new-index)]
-                      ; (js/console.log "candidate-block" c (clj->js candidate-block))
-                      ; find a block with one byte of leading zeros (fixed difficulty)
-                      (if (not= (aget (candidate-block :hash) 0) 0)
-                        (recur (inc c))
-                          candidate-block)))]
+(defn is-valid-transaction [transaction]
+  ; TODO: check balance
+  ; TODO: check from address is own
+  ; TODO: check signature
+  (and
+        (= (.-length (transaction :to)) 32)
+        (= (.-length (transaction :from)) 32)
+        (> (transaction :amount) 0)))
+
+(defn is-valid-block [block]
+  (or
+    (= block (make-genesis-block))
+    true))
+
+(defn add-block-to-blockchain [new-state new-block]
+  (if (is-valid-block new-block)
     (-> new-state
         (update-in [:blockchain] conj new-block)
-        (assoc :mempool mempool-remaining))))
+        (assoc :mempool (clojure.set/difference (new-state :mempool) (set (new-block :transactions)))))
+    new-state))
 
 (defn add-transaction-to-mempool [new-state transaction]
-  (if (validate-transaction transaction) 
+  (if (is-valid-transaction transaction) 
     (update-in new-state [:mempool] conj transaction)
     new-state))
+
+(defn mine-block [new-state]
+  ; TODO: move this inside the loop and use atom
+  ; which could receive new transactions while we're mining
+  (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
+        ; split top transactions by fee off mempool
+        [transactions mempool-remaining] (split-at 9 mempool-by-fee)
+        coinbase-transaction (make-transaction (new-state :keypair) (pk @state) "0x00000000000000000000000000000000" 10 0)
+        transactions (conj transactions coinbase-transaction)
+        previous-hash (-> new-state :blockchain (last) :hash)
+        new-index (-> new-state :blockchain (count))]
+    (loop [c 0]
+      (let [candidate-block (make-block (now) transactions previous-hash new-index)]
+        ; (js/console.log "candidate-block" c (clj->js candidate-block))
+        ; find a block with one byte of leading zeros (fixed difficulty)
+        (if (not= (aget (candidate-block :hash) 0) 0)
+          (recur (inc c))
+          candidate-block)))))
 
 (defn median [& ar]
   (let [l (count ar)]
@@ -140,7 +155,8 @@
 
 (defn submit-block! [state miner-ui]
   (reset! miner-ui "Mining a block...")
-  (swap! state mine-block)
+  (let [new-block (mine-block @state)]
+    (swap! state add-block-to-blockchain new-block))
   (reset! miner-ui (str "Found block: " (-> @state :blockchain last :hash (fingerprint)))))
 
 (defn copy-pk []
@@ -209,7 +225,7 @@
 (defn init! []
   (swap! state assoc
          :keypair (make-keypair)
-         :blockchain [(make-block 0 #{} genesis-hash 0)]
+         :blockchain [(make-genesis-block)]
          :mempool #{})
   ; app state mutation happens here
   (mount-root))
