@@ -224,16 +224,16 @@
           [:h3 "wallet"]
           [:p "public key: " [:input#pk {:value (pk @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
           [:p "balance: " balance]]
+         [:div#mining
+          [:h3 "mining"]
+          [:button {:on-click (partial submit-block! state miner-ui)} "mine a block"]
+          [:span#mining @miner-ui]]
          [:div#ui
           [:h3 "make transaction"]
           [:input {:placeholder "to public key" :on-change #(reset! to (.replace (-> % .-target .-value) #"[^A-Fa-f0-9]" "")) :value @to}]
           [:input {:placeholder "amount" :on-change #(reset! amount (.replace (-> % .-target .-value) #"[^0-9]" "")) :value @amount}]
           [:input {:placeholder "fee" :on-change #(reset! fee (.replace (-> % .-target .-value) #"[^0-9]" "")) :value (or @fee (fee-calc @state median nil))}]
           [:button {:on-click (partial submit-transaction! state interface) :disabled (not (and (> (int @amount) 0) (<= (+ (int @amount) (int @fee)) balance) (= (.-length (from-hex @to)) 32)))} "Send"]]
-         [:div#mining
-          [:h3 "mining"]
-          [:button {:on-click (partial submit-block! state miner-ui)} "mine a block"]
-          [:span#mining @miner-ui]]
          [:div#stats
           [:h3 "mempool"]
           [:table
