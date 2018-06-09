@@ -65,17 +65,19 @@
 (def genesis-hash
   (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
 
+(defn compute-block-hash [previous-hash t transactions-hash nonce]
+  (hash-object [(to-hex previous-hash)
+                t
+                (to-hex (hash-object transactions))
+                (to-hex nonce)]))
+
 (defn make-block [t transactions previous-hash new-index nonce]
-  (let [new-hash (hash-object [(to-hex previous-hash)
-                               t
-                               (to-hex (hash-object transactions))
-                               (to-hex nonce)])]
-    {:timestamp t
-     :transactions transactions
-     :hash new-hash
-     :nonce nonce
-     :index new-index
-     :previous-hash previous-hash}))
+  {:timestamp t
+   :transactions transactions
+   :hash (compute-block-hash previous-hash t transactions-hash nonce)
+   :nonce nonce
+   :index new-index
+   :previous-hash previous-hash})
 
 (defn make-genesis-block []
   (make-block 0 #{} genesis-hash 0 (Uint8Array.from [0 0 0 0 0 0 0 0])))
