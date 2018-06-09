@@ -195,7 +195,7 @@
              [:div.transaction "genesis block"]
              (for [t (b :transactions)]
                [:div.transaction {:key (fingerprint (hash-object t))}
-                [:div (fingerprint (t :to)) " -> " (fingerprint (t :from))
+                [:div (fingerprint (t :from)) " -> " (fingerprint (t :to))
                  [:span.amount (t :amount)]
                  [:span.fee "fee: " (t :fee)]
                  [:span.signature "signature: " (fingerprint (t :signature))]]]))])]])))

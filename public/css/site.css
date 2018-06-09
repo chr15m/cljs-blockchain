@@ -52,7 +52,7 @@ input {
 
 input#pk {
   padding: 0px;
-  width: 32rem;
+  width: 33rem;
   border: none;
   text-overflow: ellipsis;
 }
