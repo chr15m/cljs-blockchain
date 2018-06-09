@@ -110,7 +110,8 @@
 (defn compute-balance [transactions address]
   (let [ledger (for [transaction transactions]
                  (cond
-                   (= (to-hex (transaction :from)) (to-hex (transaction :to))) (* -1 (transaction :fee))
+                   (and (= (to-hex (transaction :from)) (to-hex (transaction :to)))
+                        (= (to-hex (transaction :from)) address)) (* -1 (transaction :fee))
                    (= (to-hex (transaction :from)) address) (* -1 (+ (transaction :amount) (transaction :fee)))
                    (= (to-hex (transaction :to)) address) (transaction :amount)
                    :else 0))]
