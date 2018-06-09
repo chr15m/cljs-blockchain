@@ -8,9 +8,10 @@
     [reagent.core :as r]))
 
 ; TODO:
-; * use localStorage window storage event to pass transactions and blocks around
+; * UI disable button if invalid values
 ; * validate transactions when added
 ; * validate blockchain when a block is added
+; * use localStorage window storage event to pass transactions and blocks around
 
 (defonce state (r/atom {}))
 
@@ -34,8 +35,8 @@
       (to-hex)
       (.substring 0 8)))
 
-(defn pk [state]
-  (-> state
+(defn pk [state-val]
+  (-> state-val
       :keypair
       (or #js {})
       (.. -publicKey)
@@ -85,9 +86,9 @@
         signature (sign-datastructure keypair transaction)]
     (assoc transaction :signature signature)))
 
-(defn compute-balance [state address]
-  (let [transactions (for [block (state :blockchain) transaction (block :transactions)] transaction)
-        transactions (concat transactions (state :mempool))
+(defn compute-balance [state-val address]
+  (let [transactions (for [block (state-val :blockchain) transaction (block :transactions)] transaction)
+        transactions (concat transactions (state-val :mempool))
         ledger (for [transaction transactions]
                  (cond
                    (= (to-hex (transaction :from)) (to-hex (transaction :to))) (* -1 (transaction :fee))
@@ -113,29 +114,29 @@
     (= block (make-genesis-block))
     true))
 
-(defn add-block-to-blockchain [new-state new-block]
-  (if (is-valid-block new-block (last (new-state :blockchain)))
-    (-> new-state
+(defn add-block-to-blockchain [state-val new-block]
+  (if (is-valid-block new-block (last (state-val :blockchain)))
+    (-> state-val
         (update-in [:blockchain] conj new-block)
-        (assoc :mempool (clojure.set/difference (new-state :mempool) (set (new-block :transactions)))))
-    new-state))
+        (assoc :mempool (clojure.set/difference (state-val :mempool) (set (new-block :transactions)))))
+    state-val))
 
-(defn add-transaction-to-mempool [new-state transaction]
+(defn add-transaction-to-mempool [state-val transaction]
   (if (is-valid-transaction transaction) 
-    (update-in new-state [:mempool] conj transaction)
-    new-state))
+    (update-in state-val [:mempool] conj transaction)
+    state-val))
 
-(defn mine-block [new-state]
+(defn mine-block [state-val]
   ; TODO: move this inside the loop and use atom
   ; which could receive new transactions while we're mining
-  (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
+  (let [mempool-by-fee (reverse (sort-by :fee (state-val :mempool)))
         ; split top transactions by fee off mempool
         [transactions mempool-remaining] (split-at 9 mempool-by-fee)
         fees (apply + (map :fee transactions))
-        coinbase-transaction (make-transaction (new-state :keypair) (pk @state) "0x00000000000000000000000000000000" (+ 10 fees) 0)
+        coinbase-transaction (make-transaction (state-val :keypair) (pk state-val) "0x00000000000000000000000000000000" (+ 10 fees) 0)
         transactions (conj transactions coinbase-transaction)
-        previous-hash (-> new-state :blockchain (last) :hash)
-        new-index (-> new-state :blockchain (count))]
+        previous-hash (-> state-val :blockchain (last) :hash)
+        new-index (-> state-val :blockchain (count))]
     (loop [c 0]
       (let [candidate-block (make-block (now) transactions previous-hash new-index)]
         ; (js/console.log "candidate-block" c (clj->js candidate-block))
@@ -149,9 +150,9 @@
     (when (> l 0)
       (nth (sort ar) (int (/ l 2))))))
 
-(defn fee-calc [state f default]
+(defn fee-calc [state-val f default]
   (or
-    (apply f (map :fee (state :mempool)))
+    (apply f (map :fee (state-val :mempool)))
     default))
 
 ;; -------------------------
