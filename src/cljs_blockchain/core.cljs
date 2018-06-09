@@ -16,7 +16,7 @@
 ; * validate blockchain when a block is added
 ; * compute POW at mining stage
 
-(defonce state (r/atom {:incoming (chan)}))
+(defonce state (r/atom {}))
 
 ;*** utility fns ***;
 
@@ -53,7 +53,7 @@
 
 ;*** blockchain ***;
 
-(defn blockchain-make-genesis-block [t]
+(defn blockchain-make-genesis-block []
   {:timestamp 0
    :transactions #{}
    :hash (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw")))
@@ -120,44 +120,19 @@
     (.setItem storage "secret-key" (prn-str (js/Array.from (.-secretKey k))))
     k))
 
-;*** main event loop ***;
-
-(defn process-event [new-state event]
-  (cond
-    (event :add-transaction) (add-transaction-to-mempool new-state (event :add-transaction))
-    (event :add-block) (add-block-to-blockchain new-state)
-    :else new-state))
-
-(defn main-loop [old-state]
-  (go
-    (let [new-state old-state
-          ; wait for events
-          event (<! (new-state :incoming))
-          ; ensure blockchain structure
-          new-state (update-in new-state [:blockchain] #(if (nil? %) [] %))
-          ; ensure genesis block
-          new-state (update-in new-state [:blockchain 0] #(or % (blockchain-make-genesis-block (now))))
-          ; ensure mempool structure
-          new-state (update-in new-state [:mempool] #(or % #{}))
-          ; ensure webtorrent connection
-          ; process events
-          new-state (try (process-event new-state event) (catch :default e (do (js/console.error e) new-state)))]
-      (js/console.log "main-loop new-state:" (clj->js new-state))
-      new-state)))
-
 ;; -------------------------
 ;; User interface
 
-(defn submit-transaction [state interface]
-  (put! (@state :incoming) {:add-transaction
-                            {:to (@interface :to)
-                             :from (pk @state)
-                             :amount (int (@interface :amount))
-                             :fee (int (@interface :fee))}})
+(defn submit-transaction! [state interface]
+  (swap! state add-transaction-to-mempool
+         {:to (@interface :to)
+          :from (pk @state)
+          :amount (int (@interface :amount))
+          :fee (int (@interface :fee))})
   (reset! interface {}))
 
-(defn submit-block [state]
-  (put! (@state :incoming) {:add-block true}))
+(defn submit-block! [state]
+  (swap! state add-block-to-blockchain))
 
 (defn home-page [state]
   ; TODO: transaction validation
@@ -180,10 +155,10 @@
         [:input {:placeholder "amount" :type "number" :on-change #(reset! amount (-> % .-target .-value)) :value @amount}]
         [:input {:placeholder "fee" :type "number" :on-change #(reset! fee (-> % .-target .-value)) :value @fee}]
         ; [:input {:placeholder "message"}]
-        [:button {:on-click (partial submit-transaction state interface)} "Send"]]
+        [:button {:on-click (partial submit-transaction! state interface)} "Send"]]
        [:div#mining
         [:h3 "mining"]
-        [:button {:on-click (partial submit-block state)} "mine a block"]]
+        [:button {:on-click (partial submit-block! state)} "mine a block"]]
        [:div#stats
         [:h3 "stats"]
         [:table
@@ -218,12 +193,13 @@
 ;; Initialize app
 
 (defn mount-root []
-  (put! (@state :incoming) :init)
   (r/render [home-page state] (.getElementById js/document "app")))
 
 (defn init! []
-  (swap! state assoc :keypair (ensure-keypair!))
+  (swap! state assoc
+         :keypair (ensure-keypair!)
+         :blockchain [(blockchain-make-genesis-block)]
+         :mempool #{})
   ; app state mutation happens here
-  (go-loop [] (reset! state (<! (main-loop @state))) (recur))
   (mount-root))
 
