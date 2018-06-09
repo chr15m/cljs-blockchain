@@ -13,14 +13,10 @@
 ; * validate blockchain when a block is added
 ; * add coinbase transaction
 ; * function to compute total
-; * compute POW at mining stage
-; * UI validation
 
 (defonce state (r/atom {}))
 
 ;*** utility fns ***;
-
-(def ms-per-day (* 1000 60 60 24))
 
 (def storage (aget js/window "localStorage"))
 
@@ -49,7 +45,11 @@
       (to-hex)))
 
 (defn hash-object [t]
-  (nacl.hash (Uint8Array.from (bencode/encode (clj->js t)))))
+  (-> t
+       (clj->js)
+       (bencode/encode)
+       (Uint8Array.from)
+       (nacl.hash)))
 
 ;*** crypto ***;
 
@@ -58,10 +58,7 @@
 
 (defn sign-datastructure [keypair datastructure]
   (nacl.sign.detached
-    (->> datastructure
-         (clj->js)
-         (bencode/encode)
-         (Uint8Array.from))
+    (hash-object datastructure)
     (.. keypair -secretKey)))
 
 ;*** blockchain ***;
