@@ -65,9 +65,8 @@
 (def genesis-hash
   (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
 
-(defn make-block [t transactions previous-hash new-index]
-  (let [nonce (nacl.randomBytes 8)
-        new-hash (hash-object [(to-hex previous-hash)
+(defn make-block [t transactions previous-hash new-index nonce]
+  (let [new-hash (hash-object [(to-hex previous-hash)
                                t
                                (to-hex (hash-object transactions))
                                (to-hex nonce)])]
@@ -79,7 +78,7 @@
      :previous-hash previous-hash}))
 
 (defn make-genesis-block []
-  (make-block 0 #{} genesis-hash 0))
+  (make-block 0 #{} genesis-hash 0 (Uint8Array.from [0 0 0 0 0 0 0 0])))
 
 (defn make-transaction [keypair to from amount fee]
   (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee)}
@@ -138,7 +137,7 @@
         previous-hash (-> state-val :blockchain (last) :hash)
         new-index (-> state-val :blockchain (count))]
     (loop [c 0]
-      (let [candidate-block (make-block (now) transactions previous-hash new-index)]
+      (let [candidate-block (make-block (now) transactions previous-hash new-index (nacl.randomBytes 8))]
         ; (js/console.log "candidate-block" c (clj->js candidate-block))
         ; find a block with one byte of leading zeros (fixed difficulty)
         (if (not= (aget (candidate-block :hash) 0) 0)
