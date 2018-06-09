@@ -50,9 +50,6 @@
 (defn hash-object [t]
   (nacl.hash (Uint8Array.from (bencode/encode (clj->js t)))))
 
-(def genesis-hash
-  (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
-
 ;*** crypto ***;
 
 (defn ensure-keypair! []
@@ -63,12 +60,19 @@
 
 ;*** blockchain ***;
 
-(defn fee-calc [state f default]
-  (or
-    (apply f (map :fee (state :mempool)))
-    default))
+(def genesis-hash
+  (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
 
-(defn blockchain-make-block [t transactions previous-hash new-index]
+(defn validate-transaction [transaction]
+  ; TODO: check balance
+  ; TODO: check from address is own
+  ; TODO: check signature
+  (and
+        (= (.-length (transaction :to)) 32)
+        (= (.-length (transaction :from)) 32)
+        (> (transaction :amount) 0)))
+
+(defn make-block [t transactions previous-hash new-index]
   (let [nonce (nacl.randomBytes 8)
         new-hash (hash-object [(to-hex previous-hash)
                                t
@@ -81,6 +85,19 @@
      :index new-index
      :previous-hash previous-hash}))
 
+(defn make-transaction [keypair to from amount fee]
+  ; TODO: regex check to is hex
+  ; TODO: regex check from is hex
+  ; TODO: regex check amount is number
+  (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee)}
+        signature (nacl.sign.detached
+                    (->> transaction
+                         (clj->js)
+                         (bencode/encode)
+                         (Uint8Array.from))
+                    (.. keypair -secretKey))]
+    (assoc transaction :signature signature)))
+
 (defn mine-block [new-state]
   ; split top ten transactions by fee off mempool
   (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
@@ -88,7 +105,7 @@
         previous-hash (-> new-state :blockchain (last) :hash)
         new-index (-> new-state :blockchain (count))
         new-block (loop [c 0]
-                    (let [candidate-block (blockchain-make-block (now) transactions previous-hash new-index)]
+                    (let [candidate-block (make-block (now) transactions previous-hash new-index)]
                       ; (js/console.log "candidate-block" c (clj->js candidate-block))
                       ; find a block with one byte of leading zeros (fixed difficulty)
                       (if (not= (aget (candidate-block :hash) 0) 0)
@@ -98,43 +115,27 @@
         (update-in [:blockchain] conj new-block)
         (assoc :mempool mempool-remaining))))
 
-(defn add-transaction-to-mempool [new-state {:keys [to from amount fee]}]
-  (print "adding transaction:" to from amount)
-  ; TODO: regex check to is hex
-  ; TODO: regex check from is hex
-  ; TODO: regex check amount is number
-  (let [to (from-hex to)
-        from (from-hex from)
-        amount (int amount)
-        transaction {:to to :from from :amount amount :fee fee}
-        signature (nacl.sign.detached
-                    (->> transaction
-                         (clj->js)
-                         (bencode/encode)
-                         (Uint8Array.from))
-                    (-> new-state
-                        :keypair
-                        (or #js {})
-                        (.. -secretKey)))
-        transaction (assoc transaction :signature signature)]
-    ; TODO: also check balance
-    ; TODO: also check from address is own
-    (if (and
-          (= (.-length to) 32)
-          (= (.-length from) 32)
-          (> amount 0))
-      (update-in new-state [:mempool] conj transaction)
-      new-state)))
+(defn add-transaction-to-mempool [new-state transaction]
+  (if (validate-transaction transaction) 
+    (update-in new-state [:mempool] conj transaction)
+    new-state))
+
+(defn fee-calc [state f default]
+  (or
+    (apply f (map :fee (state :mempool)))
+    default))
 
 ;; -------------------------
 ;; User interface
 
 (defn submit-transaction! [state interface]
-  (swap! state add-transaction-to-mempool
-         {:to (@interface :to)
-          :from (pk @state)
-          :amount (int (@interface :amount))
-          :fee (int (@interface :fee))})
+  (let [transaction (make-transaction
+                      (@state :keypair)
+                      (@interface :to)
+                      (pk @state)
+                      (int (@interface :amount))
+                      (int (@interface :fee)))]
+    (swap! state add-transaction-to-mempool transaction))
   (reset! interface {}))
 
 (defn submit-block! [state miner-ui]
@@ -202,7 +203,7 @@
 (defn init! []
   (swap! state assoc
          :keypair (ensure-keypair!)
-         :blockchain [(blockchain-make-block 0 #{} genesis-hash 0)]
+         :blockchain [(make-block 0 #{} genesis-hash 0)]
          :mempool #{})
   ; app state mutation happens here
   (mount-root))
