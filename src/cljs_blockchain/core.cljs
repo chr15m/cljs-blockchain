@@ -11,7 +11,6 @@
 ; * use localStorage window storage event to pass transactions and blocks around
 ; * validate transactions when added
 ; * validate blockchain when a block is added
-; * function to compute total
 
 (defonce state (r/atom {}))
 
@@ -86,6 +85,17 @@
         signature (sign-datastructure keypair transaction)]
     (assoc transaction :signature signature)))
 
+(defn compute-balance [state address]
+  (let [transactions (for [block (state :blockchain) transaction (block :transactions)] transaction)
+        transactions (concat transactions (state :mempool))
+        ledger (for [transaction transactions]
+                 (cond
+                   (= (to-hex (transaction :from)) (to-hex (transaction :to))) (* -1 (transaction :fee))
+                   (= (to-hex (transaction :from)) address) (* -1 (+ (transaction :amount) (transaction :fee)))
+                   (= (to-hex (transaction :to)) address) (transaction :amount)
+                   :else 0))]
+    (apply + ledger)))
+
 (defn is-valid-transaction [transaction]
   ; TODO: check balance
   ; TODO: check from address is own
@@ -95,13 +105,16 @@
         (= (.-length (transaction :from)) 32)
         (> (transaction :amount) 0)))
 
-(defn is-valid-block [block]
+(defn is-valid-block [block previous-block]
+  ; TODO: check all transactions in block
+  ; TODO: check hash
+  ; TODO: check index
   (or
     (= block (make-genesis-block))
     true))
 
 (defn add-block-to-blockchain [new-state new-block]
-  (if (is-valid-block new-block)
+  (if (is-valid-block new-block (last (new-state :blockchain)))
     (-> new-state
         (update-in [:blockchain] conj new-block)
         (assoc :mempool (clojure.set/difference (new-state :mempool) (set (new-block :transactions)))))
@@ -118,7 +131,8 @@
   (let [mempool-by-fee (reverse (sort-by :fee (new-state :mempool)))
         ; split top transactions by fee off mempool
         [transactions mempool-remaining] (split-at 9 mempool-by-fee)
-        coinbase-transaction (make-transaction (new-state :keypair) (pk @state) "0x00000000000000000000000000000000" 10 0)
+        fees (apply + (map :fee transactions))
+        coinbase-transaction (make-transaction (new-state :keypair) (pk @state) "0x00000000000000000000000000000000" (+ 10 fees) 0)
         transactions (conj transactions coinbase-transaction)
         previous-hash (-> new-state :blockchain (last) :hash)
         new-index (-> new-state :blockchain (count))]
@@ -180,7 +194,7 @@
        [:div#user
         [:h3 "wallet"]
         [:p "public key: " [:input#pk {:value (pk @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
-        [:p "balance: " 0]]
+        [:p "balance: " (compute-balance @state (pk @state))]]
        [:div#ui
         [:h3 "make transaction"]
         [:input {:placeholder "to public key" :on-change #(reset! to (.replace (-> % .-target .-value) #"[^A-Fa-f0-9]" "")) :value @to}]
