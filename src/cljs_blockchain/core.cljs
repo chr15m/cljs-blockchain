@@ -51,15 +51,10 @@
 (defn hash-object [t]
   (nacl.hash (Uint8Array.from (bencode/encode (clj->js t)))))
 
-;*** blockchain ***;
+(def genesis-hash
+  (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
 
-(defn blockchain-make-genesis-block []
-  {:timestamp 0
-   :transactions #{}
-   :hash (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw")))
-   :nonce 0
-   :index 0
-   :previous-hash 0x1})
+;*** blockchain ***;
 
 (defn blockchain-make-block [t transactions previous-hash new-index]
   (let [nonce (nacl.randomBytes 8)
@@ -180,7 +175,7 @@
         (for [b (reverse (@state :blockchain))]
           [:div.block {:key (fingerprint (b :hash))}
            [:strong "block: " (fingerprint (b :hash)) " (" (inc (b :index)) ")"]
-           (if (= (b :previous-hash) 0x1)
+           (if (= (b :index) 0)
              [:div.transaction "genesis block"]
              (for [t (b :transactions)]
                [:div.transaction {:key (fingerprint (hash-object t))}
@@ -198,7 +193,7 @@
 (defn init! []
   (swap! state assoc
          :keypair (ensure-keypair!)
-         :blockchain [(blockchain-make-genesis-block)]
+         :blockchain [(blockchain-make-block 0 #{} genesis-hash 0)]
          :mempool #{})
   ; app state mutation happens here
   (mount-root))
