@@ -120,6 +120,9 @@
 (defn blockchain-transactions [blockchain]
   (for [block blockchain transaction (block :transactions)] transaction))
 
+(defn is-genesis-block [block]
+  (= (to-hex (hash-object block)) (to-hex (hash-object (make-genesis-block)))))
+
 (defn is-valid-transaction [transactions transaction]
   (and
     (= (.-length (transaction :to)) 32)
@@ -139,7 +142,7 @@
         coinbase-transaction (first (block :transactions))
         transactions (rest (block :transactions))]
     (or
-      (= (to-hex (hash-object block)) (to-hex (hash-object (make-genesis-block))))
+      (is-genesis-block block)
       (and
         (= (block :index) (inc (previous-block :index)))
         (= (to-hex (block :hash)) (to-hex (compute-block-hash (block :timestamp) (block :transactions) (previous-block :hash) (block :nonce))))
