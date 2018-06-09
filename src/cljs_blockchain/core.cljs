@@ -68,6 +68,9 @@
       signature
       pk)))
 
+(defn make-nonce []
+  (nacl.randomBytes 8))
+
 ;*** blockchain ***;
 
 (def genesis-hash
@@ -91,7 +94,7 @@
   (make-block 0 #{} genesis-hash 0 (Uint8Array.from [0 0 0 0 0 0 0 0])))
 
 (defn make-transaction [keypair to from amount fee]
-  (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee)}
+  (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee) :nonce (make-nonce)}
         signature (sign-datastructure keypair transaction)]
     (assoc transaction :signature signature)))
 
@@ -120,9 +123,14 @@
   ; TODO: check hash matches
   ; TODO: check pow
   ; TODO: check coinbase sums feeds + bonus
+  (js/console.log (clj->js block) (clj->js previous-block))
   (or
     (= block (make-genesis-block))
-    true))
+    (and
+      (= (block :index) (inc (previous-block :index)))
+      ;(= (block :hash) (compute-block-hash (block :timestamp) (block :transactions) (previous-block :hash) (block :nonce)))
+      
+      )))
 
 (defn add-block-to-blockchain [state-val new-block]
   (if (is-valid-block new-block (last (state-val :blockchain)))
@@ -148,7 +156,7 @@
         previous-hash (-> state-val :blockchain (last) :hash)
         new-index (-> state-val :blockchain (count))]
     (loop [c 0]
-      (let [candidate-block (make-block (now) transactions previous-hash new-index (nacl.randomBytes 8))]
+      (let [candidate-block (make-block (now) transactions previous-hash new-index (make-nonce))]
         ; (js/console.log "candidate-block" c (clj->js candidate-block))
         ; find a block with one byte of leading zeros (fixed difficulty)
         (if (not= (aget (candidate-block :hash) 0) 0)
