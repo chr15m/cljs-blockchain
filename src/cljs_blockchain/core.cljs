@@ -16,6 +16,8 @@
 
 (defonce state (r/atom {}))
 
+(def coinbase-from "00000000000000000000000000000000")
+
 ;*** utility fns ***;
 
 (def storage (aget js/window "localStorage"))
@@ -46,10 +48,10 @@
 
 (defn hash-object [t]
   (-> t
-       (clj->js)
-       (bencode/encode)
-       (Uint8Array.from)
-       (nacl.hash)))
+      (clj->js)
+      (bencode/encode)
+      (Uint8Array.from)
+      (nacl.hash)))
 
 ;*** crypto ***;
 
@@ -95,7 +97,11 @@
   (make-block 0 #{} genesis-hash 0 (Uint8Array.from [0 0 0 0 0 0 0 0])))
 
 (defn make-transaction [keypair to from amount fee]
-  (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee) :nonce (make-nonce)}
+  (let [transaction {:to (from-hex to)
+                     :from (from-hex from)
+                     :amount (int amount)
+                     :fee (int fee)
+                     :nonce (make-nonce)}
         signature (sign-datastructure keypair transaction)]
     (assoc transaction :signature signature)))
 
@@ -119,18 +125,27 @@
     (<= (+ (transaction :amount) (transaction :fee)) (compute-balance transactions (to-hex (transaction :from))))
     (check-datastructure-signature (transaction :from) transaction)))
 
-(defn is-valid-block [block previous-block]
-  ; TODO: check all transactions in block
-  (or
-    (= block (make-genesis-block))
-    (and
-      (= (block :index) (inc (previous-block :index)))
-      (= (to-hex (block :hash)) (to-hex (compute-block-hash (block :timestamp) (block :transactions) (previous-block :hash) (block :nonce))))
-      (= (aget (block :hash) 0) 0)
-      (= (-> block :transactions (nth 0) :amount) (+ (apply + (map :fee (block :transactions))) 10)))))
+(defn is-valid-coinbase-transaction [transaction block]
+  (and
+    (= (transaction :fee) 0)
+    (= (to-hex (transaction :from)) coinbase-from)
+    (= (transaction :amount) (+ (apply + (map :fee (block :transactions))) 10))))
+
+(defn is-valid-block [block blockchain]
+  (let [previous-block (last blockchain)
+        coinbase-transaction (first (block :transactions))
+        transactions (rest (block :transactions))]
+    (or
+      (= block (make-genesis-block))
+      (and
+        (= (block :index) (inc (previous-block :index)))
+        (= (to-hex (block :hash)) (to-hex (compute-block-hash (block :timestamp) (block :transactions) (previous-block :hash) (block :nonce))))
+        (= (aget (block :hash) 0) 0)
+        (= (count (remove #(is-valid-transaction (blockchain-transactions blockchain) %) transactions)) 0)
+        (is-valid-coinbase-transaction coinbase-transaction block)))))
 
 (defn add-block-to-blockchain [state-val new-block]
-  (if (is-valid-block new-block (last (state-val :blockchain)))
+  (if (is-valid-block new-block (state-val :blockchain))
     (-> state-val
         (update-in [:blockchain] conj new-block)
         (assoc :mempool (clojure.set/difference (state-val :mempool) (set (new-block :transactions)))))
@@ -148,7 +163,7 @@
         ; split top transactions by fee off mempool
         [transactions mempool-remaining] (split-at 9 mempool-by-fee)
         fees (apply + (map :fee transactions))
-        coinbase-transaction (make-transaction (state-val :keypair) (pk state-val) "0x00000000000000000000000000000000" (+ 10 fees) 0)
+        coinbase-transaction (make-transaction (state-val :keypair) (pk state-val) coinbase-from (+ 10 fees) 0)
         transactions (conj transactions coinbase-transaction)
         previous-hash (-> state-val :blockchain (last) :hash)
         new-index (-> state-val :blockchain (count))]
