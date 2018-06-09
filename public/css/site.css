@@ -50,6 +50,13 @@ input {
   margin: 0.25em;
 }
 
+input#pk {
+  padding: 0px;
+  width: 32rem;
+  border: none;
+  text-overflow: ellipsis;
+}
+
 button {
   font-size: 1em;
   margin: 0.25em;

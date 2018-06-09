@@ -14,6 +14,7 @@
 ; * add coinbase transaction
 ; * function to compute total
 ; * compute POW at mining stage
+; * UI validation
 
 (defonce state (r/atom {}))
 
@@ -86,9 +87,6 @@
      :previous-hash previous-hash}))
 
 (defn make-transaction [keypair to from amount fee]
-  ; TODO: regex check to is hex
-  ; TODO: regex check from is hex
-  ; TODO: regex check amount is number
   (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee)}
         signature (nacl.sign.detached
                     (->> transaction
@@ -120,6 +118,11 @@
     (update-in new-state [:mempool] conj transaction)
     new-state))
 
+(defn median [& ar]
+  (let [l (count ar)]
+    (when (> l 0)
+      (nth (sort ar) (int (/ l 2))))))
+
 (defn fee-calc [state f default]
   (or
     (apply f (map :fee (state :mempool)))
@@ -143,6 +146,12 @@
   (swap! state mine-block)
   (reset! miner-ui (str "Found block: " (-> @state :blockchain last :hash (fingerprint)))))
 
+(defn copy-pk []
+  (let [pk-el (js/document.getElementById "pk")]
+    (.focus pk-el)
+    (.select pk-el)
+    (.execCommand js/document "copy")))
+
 (defn home-page [state]
   ; TODO: transaction validation
   (let [interface (r/atom {})
@@ -157,13 +166,13 @@
         [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]]
        [:div#user
         [:h3 "wallet"]
-        [:p "public key: " [:code (pk @state)]]
+        [:p "public key: " [:input#pk {:value (pk @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
         [:p "balance: " 0]]
        [:div#ui
         [:h3 "make transaction"]
-        [:input {:placeholder "to public key" :on-change #(reset! to (-> % .-target .-value)) :value @to}]
-        [:input {:placeholder "amount" :type "number" :on-change #(reset! amount (-> % .-target .-value)) :value @amount}]
-        [:input {:placeholder "fee" :type "number" :on-change #(reset! fee (-> % .-target .-value)) :value (or @fee (fee-calc @state max nil))}]
+        [:input {:placeholder "to public key" :on-change #(reset! to (.replace (-> % .-target .-value) #"[^A-Fa-f0-9]" "")) :value @to}]
+        [:input {:placeholder "amount" :on-change #(reset! amount (.replace (-> % .-target .-value) #"[^0-9]" "")) :value @amount}]
+        [:input {:placeholder "fee" :on-change #(reset! fee (.replace (-> % .-target .-value) #"[^0-9]" "")) :value (or @fee (fee-calc @state median nil))}]
         ; [:input {:placeholder "message"}]
         [:button {:on-click (partial submit-transaction! state interface)} "Send"]]
        [:div#mining
