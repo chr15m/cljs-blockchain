@@ -53,11 +53,16 @@
 
 ;*** crypto ***;
 
-(defn ensure-keypair! []
-  (let [k (cljs.reader/read-string (.getItem storage "secret-key"))
-        k (if k (nacl.sign.keyPair.fromSecretKey (js/Uint8Array. k)) (nacl.sign.keyPair))]
-    (.setItem storage "secret-key" (prn-str (js/Array.from (.-secretKey k))))
-    k))
+(defn make-keypair []
+  (nacl.sign.keyPair))
+
+(defn sign-datastructure [keypair datastructure]
+  (nacl.sign.detached
+    (->> datastructure
+         (clj->js)
+         (bencode/encode)
+         (Uint8Array.from))
+    (.. keypair -secretKey)))
 
 ;*** blockchain ***;
 
@@ -88,12 +93,7 @@
 
 (defn make-transaction [keypair to from amount fee]
   (let [transaction {:to (from-hex to) :from (from-hex from) :amount (int amount) :fee (int fee)}
-        signature (nacl.sign.detached
-                    (->> transaction
-                         (clj->js)
-                         (bencode/encode)
-                         (Uint8Array.from))
-                    (.. keypair -secretKey))]
+        signature (sign-datastructure keypair transaction)]
     (assoc transaction :signature signature)))
 
 (defn mine-block [new-state]
@@ -211,7 +211,7 @@
 
 (defn init! []
   (swap! state assoc
-         :keypair (ensure-keypair!)
+         :keypair (make-keypair)
          :blockchain [(make-block 0 #{} genesis-hash 0)]
          :mempool #{})
   ; app state mutation happens here
