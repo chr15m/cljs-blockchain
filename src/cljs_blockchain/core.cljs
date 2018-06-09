@@ -9,6 +9,7 @@
 
 ; TODO:
 ; * validate blockchain when a block is added
+; * vars: difficulty, reward
 ; * use localStorage window storage event to pass transactions and blockchains around
 ; * links: source code, resume
 ; * logo
@@ -118,19 +119,14 @@
     (check-datastructure-signature (transaction :from) transaction)))
 
 (defn is-valid-block [block previous-block]
-  ; TODO: check index
   ; TODO: check all transactions in block
-  ; TODO: check hash matches
-  ; TODO: check pow
-  ; TODO: check coinbase sums feeds + bonus
-  (js/console.log (clj->js block) (clj->js previous-block))
   (or
     (= block (make-genesis-block))
     (and
       (= (block :index) (inc (previous-block :index)))
-      ;(= (block :hash) (compute-block-hash (block :timestamp) (block :transactions) (previous-block :hash) (block :nonce)))
-      
-      )))
+      (= (to-hex (block :hash)) (to-hex (compute-block-hash (block :timestamp) (block :transactions) (previous-block :hash) (block :nonce))))
+      (= (aget (block :hash) 0) 0)
+      (= (-> block :transactions (nth 0) :amount) (+ (apply + (map :fee (block :transactions))) 10)))))
 
 (defn add-block-to-blockchain [state-val new-block]
   (if (is-valid-block new-block (last (state-val :blockchain)))
