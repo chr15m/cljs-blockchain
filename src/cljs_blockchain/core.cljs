@@ -194,6 +194,15 @@
           (recur (inc c))
           candidate-block)))))
 
+(defn resolve-blockchain-conflict [state-val new-blockchain]
+  (if (and
+        (> (count new-blockchain) (count (state-val :blockchain)))
+        (is-valid-blockchain new-blockchain))
+    (-> state-val
+        (assoc :blockchain new-blockchain)
+        (remove-blockchain-transactions-from-mempool))
+    state-val))
+
 (defn fee-calc [state-val f default]
   (or
     (apply f (map :fee (state-val :mempool)))
