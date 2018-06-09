@@ -9,7 +9,6 @@
 
 ; TODO:
 ; * validate blockchain when a block is added
-; * vars: difficulty, reward
 ; * use localStorage window storage event to pass transactions and blockchains around
 ; * links: source code, resume
 ; * logo
@@ -17,6 +16,7 @@
 (defonce state (r/atom {}))
 
 (def coinbase-from "00000000000000000000000000000000")
+(def block-reward 10)
 
 ;*** utility fns ***;
 
@@ -129,7 +129,7 @@
   (and
     (= (transaction :fee) 0)
     (= (to-hex (transaction :from)) coinbase-from)
-    (= (transaction :amount) (+ (apply + (map :fee (block :transactions))) 10))))
+    (= (transaction :amount) (+ (apply + (map :fee (block :transactions))) block-reward))))
 
 (defn is-valid-block [block blockchain]
   (let [previous-block (last blockchain)
@@ -163,7 +163,7 @@
         ; split top transactions by fee off mempool
         [transactions mempool-remaining] (split-at 9 mempool-by-fee)
         fees (apply + (map :fee transactions))
-        coinbase-transaction (make-transaction (state-val :keypair) (pk state-val) coinbase-from (+ 10 fees) 0)
+        coinbase-transaction (make-transaction (state-val :keypair) (pk state-val) coinbase-from (+ block-reward fees) 0)
         transactions (conj transactions coinbase-transaction)
         previous-hash (-> state-val :blockchain (last) :hash)
         new-index (-> state-val :blockchain (count))]
