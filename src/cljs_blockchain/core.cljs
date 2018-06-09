@@ -8,7 +8,6 @@
     [reagent.core :as r]))
 
 ; TODO:
-; * validate blockchain when a block is added
 ; * use localStorage window storage event to pass transactions and blockchains around
 ; * links: source code, resume
 ; * logo
@@ -18,14 +17,12 @@
 (def coinbase-from "00000000000000000000000000000000")
 (def block-reward 10)
 
-;*** utility fns ***;
-
 (def storage (aget js/window "localStorage"))
+
+;*** utility fns ***;
 
 (defn now []
   (-> (js/Date.) (.getTime)))
-
-;*** data manipulation ***;
 
 (defn to-hex [b]
   (.join (.map (js/Array.from (.slice b)) #(.slice (str "0" (.toString (bit-and % 0xff) 16)) -2)) ""))
@@ -46,14 +43,19 @@
       (or #js [])
       (to-hex)))
 
+(defn median [& ar]
+  (let [l (count ar)]
+    (when (> l 0)
+      (nth (sort ar) (int (/ l 2))))))
+
+;*** crypto ***;
+
 (defn hash-object [t]
   (-> t
       (clj->js)
       (bencode/encode)
       (Uint8Array.from)
       (nacl.hash)))
-
-;*** crypto ***;
 
 (defn make-keypair []
   (nacl.sign.keyPair))
@@ -174,11 +176,6 @@
         (if (not= (aget (candidate-block :hash) 0) 0)
           (recur (inc c))
           candidate-block)))))
-
-(defn median [& ar]
-  (let [l (count ar)]
-    (when (> l 0)
-      (nth (sort ar) (int (/ l 2))))))
 
 (defn fee-calc [state-val f default]
   (or
