@@ -8,7 +8,7 @@
     [reagent.core :as r]))
 
 ; TODO:
-; * use localStorage window storage event to pass transactions and blockchains around
+; * link to open window
 ; * links: source code, resume
 ; * logo
 

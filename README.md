@@ -1,4 +1,4 @@
-In-browser blockchain in ClojureScript + WebTorrent.
+In-browser blockchain in ClojureScript.
 
 ### Dev
 
