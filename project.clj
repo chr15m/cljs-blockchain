@@ -37,10 +37,6 @@
                          :npm-deps {"bencode-js" "0.0.8"
                                     "webtorrent" "0.98.24"
                                     "scrypt-js" "2.0.3"}
-                         :foreign-libs [{:file "node_modules/webtorrent/webtorrent.min.js"
-                                         :file-min "node_modules/webtorrent/webtorrent.min.js"
-                                         :provides ["cljsjs.webtorrent"]
-                                         :global-exports {cljsjs.webtorrent WebTorrent}}]
                          :source-map true
                          :optimizations :none
                          :pretty-print  true}

@@ -3,7 +3,6 @@
     [cljs.reader] 
     ["bencode-js/lib/index" :as bencode]
     ["scrypt-js/scrypt" :as scrypt]
-    [cljsjs.webtorrent :as wt]
     [cljsjs.nacl-fast :as nacl]
     [reagent.core :as r]))
 
