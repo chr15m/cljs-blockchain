@@ -264,9 +264,8 @@
         [:div
          [:div#header
           [:h2 "cljs-blockchain"]
-          [:a#resume {:href "https://mccormickit.com/resume"} "hire me"]
           [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]
-          [:p [:a {:href "" :target "_blank"} "open multiple tabs to simulate network peers"] "."]]
+          [:p [:a {:href "" :target "_blank"} "open more tabs to simulate network peers"] "."]]
          [:div#user
           [:h3 "wallet"]
           [:p "public key: " [:input#pk {:value (pk-hex @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
@@ -301,10 +300,12 @@
                (for [t (b :transactions)]
                  [:div.transaction {:key (fingerprint (hash-object t))}
                   [:div (fingerprint (t :from)) " -> " (fingerprint (t :to))
-                   [:span.amount (t :amount)]
-                   [:span.fee "fee: " (t :fee)]
-                   [:span.signature "signature: " (fingerprint (t :signature))]]]))])]
-         [:a#source {:href "https://github.com/chr15m/cljs-blockchain/blob/master/src/cljs_blockchain/core.cljs"} "view the source code"]
+                   [:div.transaction-details
+                    [:span.amount (t :amount)]
+                    [:span.fee "fee: " (t :fee)]
+                    [:span.signature "sig: " (fingerprint (t :signature))]]]]))])]
+         [:p [:a#source {:href "https://github.com/chr15m/cljs-blockchain/blob/master/src/cljs_blockchain/core.cljs"} "view the source code"]]
+         [:p [:a#resume {:href "https://mccormickit.com/resume"} "hire me"]]
          [:img#logo {:src "logo.svg"}]]))))
 
 ;; -------------------------
