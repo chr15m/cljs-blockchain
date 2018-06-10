@@ -6,10 +6,6 @@
     [cljsjs.nacl-fast :as nacl]
     [reagent.core :as r]))
 
-; TODO:
-; * links: source code, resume
-; * build and deploy
-
 (def coinbase-from "00000000000000000000000000000000")
 (def block-reward 10)
 
@@ -268,6 +264,7 @@
         [:div
          [:div#header
           [:h2 "cljs-blockchain"]
+          [:a#resume {:href "https://mccormickit.com/resume"} "hire me"]
           [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]
           [:p [:a {:href "" :target "_blank"} "open multiple tabs to simulate network peers"] "."]]
          [:div#user
@@ -307,6 +304,7 @@
                    [:span.amount (t :amount)]
                    [:span.fee "fee: " (t :fee)]
                    [:span.signature "signature: " (fingerprint (t :signature))]]]))])]
+         [:a#source {:href "https://github.com/chr15m/cljs-blockchain/blob/master/src/cljs_blockchain/core.cljs"} "view the source code"]
          [:img#logo {:src "logo.svg"}]]))))
 
 ;; -------------------------
