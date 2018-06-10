@@ -1,8 +1,6 @@
 (ns cljs-blockchain.core
   (:require
-    [cljs.reader] 
     ["bencode-js/lib/index" :as bencode]
-    ["scrypt-js/scrypt" :as scrypt]
     [cljsjs.nacl-fast :as nacl]
     [reagent.core :as r]))
 

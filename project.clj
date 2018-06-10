@@ -34,9 +34,7 @@
                          :output-dir "public/js/out"
                          :asset-path   "js/out"
                          :install-deps true
-                         :npm-deps {"bencode-js" "0.0.8"
-                                    "webtorrent" "0.98.24"
-                                    "scrypt-js" "2.0.3"}
+                         :npm-deps {"bencode-js" "0.0.8"}
                          :source-map true
                          :optimizations :none
                          :pretty-print  true}
@@ -49,9 +47,7 @@
                          :output-dir "public/js/release"
                          :asset-path   "js/out"
                          :install-deps true
-                         :npm-deps {"bencode-js" "0.0.8"
-                                    "webtorrent" "0.98.24"
-                                    "scrypt-js" "2.0.3"}
+                         :npm-deps {"bencode-js" "0.0.8"}
                          :optimizations :advanced
                          :pretty-print false}}}}
 
