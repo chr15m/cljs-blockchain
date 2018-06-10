@@ -8,7 +8,6 @@
 
 ; TODO:
 ; * links: source code, resume
-; * logo
 ; * build and deploy
 
 (def coinbase-from "00000000000000000000000000000000")
@@ -169,7 +168,7 @@
     state-val))
 
 (defn mine-block [state-val]
-  ; TODO: move this inside the loop and use atom
+  ; TODO: move vars inside the loop and use atom
   ; which could receive new transactions while we're mining
   (let [mempool-by-fee (reverse (sort-by :fee (state-val :mempool)))
         ; split top transactions by fee off mempool
@@ -307,7 +306,8 @@
                   [:div (fingerprint (t :from)) " -> " (fingerprint (t :to))
                    [:span.amount (t :amount)]
                    [:span.fee "fee: " (t :fee)]
-                   [:span.signature "signature: " (fingerprint (t :signature))]]]))])]]))))
+                   [:span.signature "signature: " (fingerprint (t :signature))]]]))])]
+         [:img#logo {:src "logo.svg"}]]))))
 
 ;; -------------------------
 ;; Initialize app
