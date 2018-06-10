@@ -243,7 +243,7 @@
                       (int (@interface :fee)))]
     (swap! state add-transaction-to-mempool transaction)
     (send-message "transaction" transaction))
-  (reset! interface {}))
+  (reset! interface {:fee (fee-calc @state median nil)}))
 
 (defn submit-block! [state miner-ui]
   (reset! miner-ui "Mining a block...")
