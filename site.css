@@ -5,6 +5,7 @@
 body {
   font-family: 'Helvetica Neue', Verdana, Helvetica, Arial, sans-serif;
   max-width: 800px;
+  width: 95%;
   margin: 0 auto;
   padding-top: 0.5em;
   -webkit-font-smoothing: antialiased;
@@ -53,6 +54,7 @@ input {
 input#pk {
   padding: 0px;
   width: 33rem;
+  max-width: 90%;
   border: none;
   text-overflow: ellipsis;
 }
@@ -88,12 +90,13 @@ td {
   margin: 0 0.5em;
 }
 
+.transaction-details {
+  display: inline-block;
+}
+
 #logo {
   width: 150px;
   display: block;
   margin: 2em auto;
 }
 
-#resume {
-  float: right;
-}
