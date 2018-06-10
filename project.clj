@@ -45,9 +45,13 @@
                        :release
                        {:source-paths ["src" "env/prod/cljs"]
                         :compiler
-                        {:output-to "public/js/app.js"
+                        {:output-to "build/js/app.js"
                          :output-dir "public/js/release"
                          :asset-path   "js/out"
+                         :install-deps true
+                         :npm-deps {"bencode-js" "0.0.8"
+                                    "webtorrent" "0.98.24"
+                                    "scrypt-js" "2.0.3"}
                          :optimizations :advanced
                          :pretty-print false}}}}
 

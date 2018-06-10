@@ -18,3 +18,4 @@ pom.xml.asc
 .rebel_readline_history
 package*.json
 node_modules
+build
