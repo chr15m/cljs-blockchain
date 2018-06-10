@@ -33,7 +33,7 @@
 (defn pk-hex [state-val]
   (-> state-val
       :keypair
-      (.. -publicKey)
+      (aget "publicKey")
       (to-hex)))
 
 (defn median [& ar]
@@ -48,7 +48,7 @@
   (-> t
       (clj->js)
       (bencode/encode)
-      (Uint8Array.from)
+      (js/Uint8Array.from)
       (nacl.hash)))
 
 (defn make-keypair []
@@ -57,7 +57,7 @@
 (defn sign-datastructure [keypair datastructure]
   (nacl.sign.detached
     (hash-object datastructure)
-    (.. keypair -secretKey)))
+    (aget keypair "secretKey")))
 
 (defn check-datastructure-signature [pk datastructure]
   (let [signature (datastructure :signature)
@@ -74,7 +74,7 @@
 ;; Blockchain
 
 (def genesis-hash
-  (hash-object "cljs-blockchain-ftw"))
+  (hash-object {:seed "cljs-blockchain-ftw"}))
 
 (defn compute-block-hash [t transactions previous-hash nonce]
   (hash-object [t transactions previous-hash nonce]))
@@ -88,7 +88,7 @@
    :previous-hash previous-hash})
 
 (defn make-genesis-block []
-  (make-block 0 #{} genesis-hash 0 (Uint8Array.from [0 0 0 0 0 0 0 0])))
+  (make-block 0 #{} genesis-hash 0 (js/Uint8Array.from [0 0 0 0 0 0 0 0])))
 
 (defn make-transaction [keypair to from amount fee]
   (let [transaction {:to (from-hex to)
