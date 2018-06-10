@@ -9,8 +9,7 @@ lein figwheel
 ### Build
 
 ```
-lein clean
-lein package
+make
 ```
 
 ### Thanks
