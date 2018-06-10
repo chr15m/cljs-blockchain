@@ -10,3 +10,8 @@ build/%: public/%
 	@mkdir -p build
 	cp $< $@
 
+.PHONY: clean
+
+clean:
+	rm -rf build/js
+	rm -f build/*
