@@ -10,15 +10,13 @@
 ; TODO:
 ; * links: source code, resume
 ; * logo
-
-(defonce state (r/atom {}))
+; * build and deploy
 
 (def coinbase-from "00000000000000000000000000000000")
 (def block-reward 10)
 
-(def storage (aget js/window "localStorage"))
-
-;*** utility fns ***;
+;; -------------------------
+;; Utility fns
 
 (defn now []
   (-> (js/Date.) (.getTime)))
@@ -34,12 +32,10 @@
       (to-hex)
       (.substring 0 8)))
 
-(defn pk [state-val]
+(defn pk-hex [state-val]
   (-> state-val
       :keypair
-      (or #js {})
       (.. -publicKey)
-      (or #js [])
       (to-hex)))
 
 (defn median [& ar]
@@ -47,7 +43,8 @@
     (when (> l 0)
       (nth (sort ar) (int (/ l 2))))))
 
-;*** crypto ***;
+;; -------------------------
+;; Crypto
 
 (defn hash-object [t]
   (-> t
@@ -75,16 +72,14 @@
 (defn make-nonce []
   (nacl.randomBytes 8))
 
-;*** blockchain ***;
+;; -------------------------
+;; Blockchain
 
 (def genesis-hash
-  (nacl.hash (js/Uint8Array.from (str "cljs-blockchain-ftw"))))
+  (hash-object "cljs-blockchain-ftw"))
 
 (defn compute-block-hash [t transactions previous-hash nonce]
-  (hash-object [(to-hex previous-hash)
-                t
-                (to-hex (hash-object transactions))
-                (to-hex nonce)]))
+  (hash-object [t transactions previous-hash nonce]))
 
 (defn make-block [t transactions previous-hash new-index nonce]
   {:timestamp t
@@ -181,7 +176,7 @@
         ; split top transactions by fee off mempool
         [transactions mempool-remaining] (split-at 9 mempool-by-fee)
         fees (apply + (map :fee transactions))
-        coinbase-transaction (make-transaction (state-val :keypair) (pk state-val) coinbase-from (+ block-reward fees) 0)
+        coinbase-transaction (make-transaction (state-val :keypair) (pk-hex state-val) coinbase-from (+ block-reward fees) 0)
         transactions (conj transactions coinbase-transaction)
         previous-hash (-> state-val :blockchain (last) :hash)
         new-index (-> state-val :blockchain (count))]
@@ -207,7 +202,12 @@
     (apply f (map :fee (state-val :mempool)))
     default))
 
-;*** "network" ***;
+;; -------------------------
+;; "network" - simulated with localStorage events
+; no mutation before this point
+; search "swap!" and "reset!" to find mutation points
+
+(defonce storage (aget js/window "localStorage"))
 
 (defn serializer [k v]
   (cond
@@ -239,7 +239,7 @@
   (let [transaction (make-transaction
                       (@state :keypair)
                       (@interface :to)
-                      (pk @state)
+                      (pk-hex @state)
                       (int (@interface :amount))
                       (int (@interface :fee)))]
     (swap! state add-transaction-to-mempool transaction)
@@ -266,7 +266,7 @@
         fee (r/cursor interface [:fee])
         miner-ui (r/cursor interface [:miner])]
     (fn []
-      (let [balance (compute-balance (concat (blockchain-transactions (@state :blockchain)) (@state :mempool)) (pk @state))]
+      (let [balance (compute-balance (concat (blockchain-transactions (@state :blockchain)) (@state :mempool)) (pk-hex @state))]
         [:div
          [:div#header
           [:h2 "cljs-blockchain"]
@@ -274,7 +274,7 @@
           [:p [:a {:href "" :target "_blank"} "open multiple tabs to simulate network peers"] "."]]
          [:div#user
           [:h3 "wallet"]
-          [:p "public key: " [:input#pk {:value (pk @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
+          [:p "public key: " [:input#pk {:value (pk-hex @state) :readOnly true}] [:button {:on-click copy-pk} "copy"]]
           [:p "balance: " balance]]
          [:div#mining
           [:h3 "mining"]
@@ -313,15 +313,14 @@
 ;; -------------------------
 ;; Initialize app
 
+(defonce state (r/atom {:keypair (make-keypair)
+                       :blockchain [(make-genesis-block)]
+                       :mempool #{}}))
+
 (defn mount-root []
   (r/render [home-page state] (.getElementById js/document "app")))
 
 (defn init! []
-  (swap! state assoc
-         :keypair (make-keypair)
-         :blockchain [(make-genesis-block)]
-         :mempool #{})
   (.addEventListener js/window "storage" (partial receive state) false)
-  ; app state mutation happens here
   (mount-root))
 
