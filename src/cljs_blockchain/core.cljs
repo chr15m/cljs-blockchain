@@ -213,7 +213,7 @@
 
 (defn deserializer [k v]
   (cond
-    (and (= (type v) js/String) (.substr v 0 2)) (from-hex (.substr v 2))
+    (and (= (type v) js/String) (= (.substr v 0 2) "0x")) (from-hex (.substr v 2))
     :else v))
 
 (defn send-message [kind message]
