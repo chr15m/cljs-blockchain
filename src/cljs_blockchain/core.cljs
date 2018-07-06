@@ -262,7 +262,6 @@
         [:div
          [:div#header
           [:h2 "cljs-blockchain"]
-          [:p [:small "provided 'as-is' without warranty of any kind. " [:strong "this is a toy"] "."]]
           [:p [:a {:href "" :target "_blank"} "open more tabs to simulate network peers"] "."]]
          [:div#user
           [:h3 "wallet"]
