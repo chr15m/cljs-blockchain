@@ -38,11 +38,16 @@
 ;; -------------------------
 ;; Crypto
 
+(defonce utf8encoder (js/TextEncoder. "utf8"))
+
+(defn string-to-utf8array [s]
+  (.encode utf8encoder s))
+
 (defn hash-object [t]
   (-> t
       (clj->js)
       (bencode/encode)
-      (js/Uint8Array.from)
+      (string-to-utf8array)
       (nacl.hash)))
 
 (defn make-keypair []
